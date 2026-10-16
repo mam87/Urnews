@@ -16,12 +16,12 @@ jobs:
       - uses: denoland/setup-deno@v2
         with: { deno-version: v2.x }
       - name: Ingest pipeline unit tests (parsing, dedup, time zones, backoff, AI guard rails)
-        working-directory: supabase/functions/ingest
+        working-directory: supabase/functions/news-ingest
         run: deno test -A tests/
       - name: Type-check edge functions
         run: |
-          (cd supabase/functions/ingest && deno check index.ts)
-          (cd supabase/functions/notify && deno check index.ts)
+          (cd supabase/functions/news-ingest && deno check index.ts)
+          (cd supabase/functions/news-notify && deno check index.ts)
       - name: Database tests (RLS, permissions, dedup, scheduler lease, alerts, search)
         env: { PGHOST: localhost, PGPORT: 5432, PGUSER: postgres, PGPASSWORD: postgres }
         run: |

@@ -15,9 +15,9 @@ function supabaseDb(sb: SupabaseClient): Db {
     return data as T;
   };
   return {
-    beginRun: () => rpc<number | null>("begin_ingest_run"),
+    beginRun: () => rpc<number | null>("news_begin_ingest_run"),
     async settings() {
-      const { data, error } = await sb.from("settings").select("key,value");
+      const { data, error } = await sb.from("news_settings").select("key,value");
       if (error) throw new Error("settings: " + error.message);
       const m = Object.fromEntries((data ?? []).map((r: { key: string; value: unknown }) => [r.key, r.value]));
       const num = (k: string, d: number) => (Number.isFinite(Number(m[k])) ? Number(m[k]) : d);
@@ -29,13 +29,13 @@ function supabaseDb(sb: SupabaseClient): Db {
         ai_summarize: m.ai_summarize === true,
       } satisfies Settings;
     },
-    claimSources: (runId, limit) => rpc<SourceRow[]>("claim_due_sources", { p_run: runId, p_limit: limit }),
-    recordFetch: (r) => rpc<void>("record_fetch", { p: r }),
-    existingHashes: async (h) => new Set(await rpc<string[]>("existing_hashes", { p_hashes: h })),
-    similar: (titles) => rpc<SimilarRow[]>("similar_articles", { p_titles: titles, p_hours: 36 }),
-    insertArticles: async (rows) => (await rpc<unknown[]>("insert_articles", { p_rows: rows })).length,
-    aiTake: (n) => rpc<number>("ai_take", { p_n: n }),
-    finishRun: (id, stats) => rpc<void>("finish_ingest_run", { p_run: id, p: stats }),
+    claimSources: (runId, limit) => rpc<SourceRow[]>("news_claim_due_sources", { p_run: runId, p_limit: limit }),
+    recordFetch: (r) => rpc<void>("news_record_fetch", { p: r }),
+    existingHashes: async (h) => new Set(await rpc<string[]>("news_existing_hashes", { p_hashes: h })),
+    similar: (titles) => rpc<SimilarRow[]>("news_similar_articles", { p_titles: titles, p_hours: 36 }),
+    insertArticles: async (rows) => (await rpc<unknown[]>("news_insert_articles", { p_rows: rows })).length,
+    aiTake: (n) => rpc<number>("news_ai_take", { p_n: n }),
+    finishRun: (id, stats) => rpc<void>("news_finish_ingest_run", { p_run: id, p: stats }),
   };
 }
 
@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
   const sb = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   const token = req.headers.get("x-ingest-token") ?? "";
-  const { data: ok, error } = await sb.rpc("check_ingest_token", { p_token: token });
+  const { data: ok, error } = await sb.rpc("news_check_ingest_token", { p_token: token });
   if (error || ok !== true) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
 
   const result = await runIngest({

@@ -8,13 +8,13 @@ const env = (k: string) => Deno.env.get(k) || "";
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
   const sb = createClient(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false } });
-  const { data: ok } = await sb.rpc("check_ingest_token", { p_token: req.headers.get("x-ingest-token") ?? "" });
+  const { data: ok } = await sb.rpc("news_check_ingest_token", { p_token: req.headers.get("x-ingest-token") ?? "" });
   if (ok !== true) return new Response("unauthorized", { status: 401 });
 
   let alertId = 0;
   try { alertId = Number((await req.json()).alert_id); } catch { /* empty body */ }
   if (!Number.isInteger(alertId) || alertId <= 0) return new Response("bad request", { status: 400 });
-  const { data: alert } = await sb.from("alerts").select("id,kind,message,created_at,notified_at").eq("id", alertId).maybeSingle();
+  const { data: alert } = await sb.from("news_alerts").select("id,kind,message,created_at,notified_at").eq("id", alertId).maybeSingle();
   if (!alert) return new Response("not found", { status: 404 });
   if (alert.notified_at) return new Response(JSON.stringify({ skipped: "already notified" }));
 
@@ -43,6 +43,6 @@ Deno.serve(async (req) => {
     }).catch((e) => ({ ok: false, status: String(e) }) as unknown as Response);
     r.ok ? sent.push("email") : errors.push(`email ${r.status}`);
   }
-  if (sent.length) await sb.from("alerts").update({ notified_at: new Date().toISOString() }).eq("id", alertId);
+  if (sent.length) await sb.from("news_alerts").update({ notified_at: new Date().toISOString() }).eq("id", alertId);
   return new Response(JSON.stringify({ sent, errors, configured: sent.length + errors.length > 0 }), { headers: { "content-type": "application/json" } });
 });

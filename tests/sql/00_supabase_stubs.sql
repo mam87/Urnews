@@ -25,3 +25,7 @@ alter default privileges in schema public grant all on tables to anon, authentic
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
 grant usage on schema realtime to service_role, authenticated; grant select on realtime.sent to service_role, authenticated;
+-- A pre-existing app sharing the project (e.g. LabGram): migrations must not touch it.
+create table public.lg_existing (id int primary key, note text);
+insert into public.lg_existing values (1, 'existing app data');
+create function public.lg_existing_fn() returns int language sql as $$ select 42 $$;

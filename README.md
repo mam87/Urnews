@@ -13,10 +13,10 @@ running.
 | Path | What |
 |---|---|
 | `supabase/migrations/` | Schema, RLS & grants, functions, seed data, scheduler, sources |
-| `supabase/functions/ingest/` | Feed fetch → parse → classify → dedupe/cluster → optional AI → insert |
-| `supabase/functions/notify/` | Admin alerts (Telegram / e-mail) |
+| `supabase/functions/news-ingest/` | Feed fetch → parse → classify → dedupe/cluster → optional AI → insert |
+| `supabase/functions/news-notify/` | Admin alerts (Telegram / e-mail) |
 | `assets/js/` | Site + admin (vanilla ES modules, vendored supabase-js) |
-| `tests/` | SQL/RLS tests, UI smoke tests; Deno tests live in `supabase/functions/ingest/tests/` |
+| `tests/` | SQL/RLS tests, UI smoke tests; Deno tests live in `supabase/functions/news-ingest/tests/` |
 | `guide/SETUP.md` | Setup, adding sources, rotating keys, backups/restore, costs |
 
 ## Editorial rules enforced in code
@@ -29,7 +29,7 @@ running.
 
 ## Tests
 ```bash
-(cd supabase/functions/ingest && deno test -A tests/)
+(cd supabase/functions/news-ingest && deno test -A tests/)
 PGHOST=/path PGPORT=5432 tests/run-sql-tests.sh
 node tests/ui/smoke.mjs . /tmp/shots
 ```

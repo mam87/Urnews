@@ -12,7 +12,7 @@ let lastIds = "";
 
 async function load() {
   const since = new Date(Date.now() - 48 * 3600_000).toISOString();
-  const { data, error } = await sb.from("articles")
+  const { data, error } = await sb.from("news_articles")
     .select("id,title,summary,source_id,published_at,breaking_until,verification,category,cluster_id")
     .eq("status", "published").eq("is_breaking", true).is("duplicate_of", null)
     .gt("published_at", since).order("published_at", { ascending: false }).limit(100);

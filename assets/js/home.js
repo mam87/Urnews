@@ -25,7 +25,7 @@ const state = {
 };
 
 function baseQuery() {
-  let qb = sb.from("articles").select(ARTICLE_COLS).eq("status", "published").is("duplicate_of", null);
+  let qb = sb.from("news_articles").select(ARTICLE_COLS).eq("status", "published").is("duplicate_of", null);
   if (cat) qb = qb.contains("categories", [cat]);
   return qb;
 }
@@ -33,7 +33,7 @@ function baseQuery() {
 async function loadClusterSizes(rows) {
   const ids = [...new Set(rows.map((r) => r.cluster_id).filter((x) => x && !state.clusterSize.has(x)))];
   if (!ids.length) return;
-  const { data } = await sb.from("clusters").select("id,source_count").in("id", ids.slice(0, 200));
+  const { data } = await sb.from("news_clusters").select("id,source_count").in("id", ids.slice(0, 200));
   for (const c of data || []) state.clusterSize.set(c.id, c.source_count);
 }
 
@@ -107,7 +107,7 @@ async function loadInitial() {
   state.shown.clear(); state.clusterCard.clear(); state.oldest = null;
   let rows;
   if (q) {
-    const { data, error } = await sb.rpc("search_articles", { p_q: q, p_category: cat, p_limit: 50, p_before: null });
+    const { data, error } = await sb.rpc("news_search_articles", { p_q: q, p_category: cat, p_limit: 50, p_before: null });
     if (error) throw error;
     rows = data;
   } else if (state.sort === "top") {
@@ -134,7 +134,7 @@ async function loadInitial() {
 async function loadLead() {
   if (q) return;
   const since = new Date(Date.now() - 12 * 3600_000).toISOString();
-  let lq = sb.from("articles").select("id,source_id,title,summary,category,published_at,cluster_id,verification,is_breaking,breaking_until,importance,pinned")
+  let lq = sb.from("news_articles").select("id,source_id,title,summary,category,published_at,cluster_id,verification,is_breaking,breaking_until,importance,pinned")
     .eq("status", "published").is("duplicate_of", null).gt("published_at", since);
   if (cat) lq = lq.contains("categories", [cat]);
   const { data, error } = await lq.order("importance", { ascending: false }).order("published_at", { ascending: false }).limit(60);
@@ -164,7 +164,7 @@ async function loadMore() {
 async function loadSide() {
   const now = new Date().toISOString();
   const [{ data: br }, status] = await Promise.all([
-    sb.from("articles").select("id,title,published_at").eq("status", "published").eq("is_breaking", true).is("duplicate_of", null)
+    sb.from("news_articles").select("id,title,published_at").eq("status", "published").eq("is_breaking", true).is("duplicate_of", null)
       .gt("breaking_until", now).order("published_at", { ascending: false }).limit(6),
     fetchStatus().catch(() => null),
   ]);
@@ -220,7 +220,7 @@ async function tick() {
 }
 
 async function onChanged(id) {
-  const { data } = await sb.from("articles").select(ARTICLE_COLS).eq("id", id).maybeSingle();
+  const { data } = await sb.from("news_articles").select(ARTICLE_COLS).eq("id", id).maybeSingle();
   const li = feedEl.querySelector(`li[data-id="${id}"]`);
   if (!data || data.status !== "published") { li?.remove(); state.shown.delete(id); }
   else if (li) {

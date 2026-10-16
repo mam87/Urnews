@@ -2,7 +2,7 @@
 
 grant execute on function public.news_normalize(text) to anon, authenticated, service_role;
 
-insert into public.categories (slug, name_ar, sort_order) values
+insert into public.news_categories (slug, name_ar, sort_order) values
   ('jordan',    'الأردن',               1),
   ('palestine', 'فلسطين',               2),
   ('arab',      'العالم العربي',        3),
@@ -14,7 +14,7 @@ insert into public.categories (slug, name_ar, sort_order) values
   ('sports',    'رياضة',                9)
 on conflict (slug) do update set name_ar = excluded.name_ar, sort_order = excluded.sort_order;
 
-insert into public.settings (key, value, description, is_public) values
+insert into public.news_settings (key, value, description, is_public) values
   ('ingest_enabled',             'true',  'تشغيل/إيقاف الجلب الآلي بالكامل', false),
   ('scheduler_interval_minutes', '2',     'فترة تشغيل المُجدول (pg_cron). كل مصدر له فترة خاصة', true),
   ('max_sources_per_run',        '8',     'أقصى عدد مصادر في كل تشغيل (لحدود CPU في الخطة المجانية)', false),

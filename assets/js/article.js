@@ -13,7 +13,7 @@ function notFound() {
 }
 
 async function render() {
-  const { data: a, error } = await sb.from("articles").select(ARTICLE_COLS).eq("id", id).maybeSingle();
+  const { data: a, error } = await sb.from("news_articles").select(ARTICLE_COLS).eq("id", id).maybeSingle();
   if (error) throw error;
   if (!a) return notFound();
   const sources = await loadSources();
@@ -23,7 +23,7 @@ async function render() {
 
   let related = [];
   if (a.cluster_id) {
-    const { data } = await sb.from("articles").select("id,title,source_id,published_at,url,verification")
+    const { data } = await sb.from("news_articles").select("id,title,source_id,published_at,url,verification")
       .eq("cluster_id", a.cluster_id).eq("status", "published").is("duplicate_of", null).neq("id", a.id)
       .order("published_at", { ascending: true }).limit(20);
     related = data || [];

@@ -109,7 +109,7 @@ export function initTheme() {
 let sourcesPromise = null;
 export function loadSources() {
   if (!sourcesPromise) {
-    sourcesPromise = sb.from("sources").select("id,slug,name_ar,homepage,kind,reliability,enabled,allow_images,last_success_at")
+    sourcesPromise = sb.from("news_sources").select("id,slug,name_ar,homepage,kind,reliability,enabled,allow_images,last_success_at")
       .then(({ data, error }) => {
         if (error) { sourcesPromise = null; throw error; }
         return new Map(data.map((s) => [s.id, s]));

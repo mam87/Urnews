@@ -22,7 +22,7 @@ async function boot() {
       tableBody))));
   if (!configured) return notConfiguredState(tableBody);
   try {
-    const { data, error } = await sb.from("sources").select("id,name_ar,homepage,kind,reliability,enabled,last_success_at").eq("enabled", true).order("name_ar");
+    const { data, error } = await sb.from("news_sources").select("id,name_ar,homepage,kind,reliability,enabled,last_success_at").eq("enabled", true).order("name_ar");
     if (error) throw error;
     tableBody.replaceChildren(...data.map((s) => h("tr", {},
       h("td", {}, h("a", { href: s.homepage, target: "_blank", rel: "noopener noreferrer" }, s.name_ar)),

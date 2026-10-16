@@ -2,7 +2,7 @@
 -- Reliability (1–5) is an editorial default; adjust it in the admin dashboard.
 -- Images are OFF by default (allow_images=false) until you confirm the source's terms allow thumbnails.
 -- English sources are disabled until an AI key is configured for translation.
-insert into public.sources (slug, name_ar, name_en, homepage, feed_url, language, country, kind, reliability, default_category, topical, tz_offset_minutes, poll_interval_minutes, min_interval_minutes, enabled, terms_note) values
+insert into public.news_sources (slug, name_ar, name_en, homepage, feed_url, language, country, kind, reliability, default_category, topical, tz_offset_minutes, poll_interval_minutes, min_interval_minutes, enabled, terms_note) values
   ('bbc-arabic',     'بي بي سي عربي',        'BBC Arabic',        'https://www.bbc.com/arabic',          'https://feeds.bbci.co.uk/arabic/rss.xml', 'ar', 'GB', 'media', 5, 'world', false, 0, 5, 3, true, 'BBC RSS: headlines+links permitted for display; non-commercial terms'),
   ('aljazeera',      'الجزيرة نت',           'Al Jazeera Arabic', 'https://www.aljazeera.net',            'https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9', 'ar', 'QA', 'media', 4, null, false, 180, 5, 3, true, 'Public RSS'),
   ('france24-ar',    'فرانس 24',             'France 24 Arabic',  'https://www.france24.com/ar/',         'https://www.france24.com/ar/rss', 'ar', 'FR', 'media', 4, 'world', false, 0, 5, 3, true, 'Public RSS'),
@@ -27,4 +27,4 @@ insert into public.sources (slug, name_ar, name_en, homepage, feed_url, language
   ('jordan-times',   'جوردان تايمز',           'The Jordan Times',  'https://jordantimes.com',              'https://jordantimes.com/rss.xml', 'en', 'JO', 'media', 4, 'jordan', false, 180, 15, 10, false, 'Enable after AI translation is configured')
 on conflict (slug) do nothing;
 
-update public.settings set value = '10' where key = 'max_sources_per_run';
+update public.news_settings set value = '10' where key = 'max_sources_per_run';

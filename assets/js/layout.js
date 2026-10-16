@@ -74,7 +74,7 @@ export function renderChrome({ active = "home" } = {}) {
 
   async function refreshTicker() {
     if (!configured) return;
-    const { data, error } = await sb.from("articles")
+    const { data, error } = await sb.from("news_articles")
       .select("id,title,published_at")
       .eq("status", "published").eq("is_breaking", true).is("duplicate_of", null)
       .gt("breaking_until", new Date().toISOString())
@@ -95,7 +95,7 @@ export function renderChrome({ active = "home" } = {}) {
 }
 
 export async function fetchStatus() {
-  const { data, error } = await sb.rpc("site_status");
+  const { data, error } = await sb.rpc("news_site_status");
   if (error) throw error;
   return data;
 }

@@ -28,7 +28,7 @@ const must = ({ data, error }) => { if (error) throw error; return data; };
 
 /* ---------------- overview ---------------- */
 async function overview() {
-  const s = must(await sb.rpc("admin_stats"));
+  const s = must(await sb.rpc("news_admin_stats"));
   const lastOk = s.last_ok_run_at;
   const healthy = lastOk && Date.now() - new Date(lastOk).getTime() < 15 * 60_000;
   const stat = (k, v, cls = "") => h("div", { class: "stat" }, h("div", { class: "v num " + cls }, v ?? "—"), h("div", { class: "k" }, k));
@@ -48,15 +48,15 @@ async function overview() {
     s.open_alerts.length ? h("div", { class: "table-wrap" }, h("table", {}, h("tbody", {}, s.open_alerts.map((a) => h("tr", {},
       h("td", {}, a.message, h("span", { class: "sub" }, a.kind)), h("td", { class: "num" }, ago(a.created_at)),
       h("td", {}, a.notified_at ? "أُرسل التنبيه" : "لم يُرسل (لا قناة مهيأة)"),
-      h("td", {}, h("button", { class: "btn", type: "button", onclick: async () => { must(await sb.from("alerts").update({ resolved_at: new Date().toISOString() }).eq("id", a.id)); go("overview"); } }, "إغلاق")))))))
+      h("td", {}, h("button", { class: "btn", type: "button", onclick: async () => { must(await sb.from("news_alerts").update({ resolved_at: new Date().toISOString() }).eq("id", a.id)); go("overview"); } }, "إغلاق")))))))
       : h("p", { class: "note" }, "لا تنبيهات مفتوحة."),
     s.last_run ? h("p", { class: "note" }, `آخر تشغيل: ${full(s.last_run.started_at)} — الحالة ${s.last_run.status}، مصادر ${s.last_run.sources_attempted} (نجح ${s.last_run.sources_ok}، فشل ${s.last_run.sources_failed})، جديد ${s.last_run.items_new}، المدة ${s.last_run.duration_ms ?? "?"}ms`) : null);
 }
 
 /* ---------------- articles ---------------- */
 async function articles(filters = { status: "", q: "", cat: "" }) {
-  const srcs = new Map(must(await sb.from("sources").select("id,name_ar")).map((s) => [s.id, s.name_ar]));
-  let qb = sb.from("articles").select("id,title,summary,source_id,url,published_at,status,verification,is_breaking,breaking_until,pinned,category,categories,edited,editor_note,duplicate_of,cluster_id").order("created_at", { ascending: false }).limit(100);
+  const srcs = new Map(must(await sb.from("news_sources").select("id,name_ar")).map((s) => [s.id, s.name_ar]));
+  let qb = sb.from("news_articles").select("id,title,summary,source_id,url,published_at,status,verification,is_breaking,breaking_until,pinned,category,categories,edited,editor_note,duplicate_of,cluster_id").order("created_at", { ascending: false }).limit(100);
   if (filters.status) qb = qb.eq("status", filters.status);
   if (filters.cat) qb = qb.contains("categories", [filters.cat]);
   if (filters.q) qb = qb.ilike("title", `%${filters.q.replace(/[%_\\]/g, "\\$&")}%`);
@@ -65,7 +65,7 @@ async function articles(filters = { status: "", q: "", cat: "" }) {
   const catSel = h("select", { "aria-label": "القسم" }, h("option", { value: "" }, "كل الأقسام"), CATEGORIES.map(([k, v]) => h("option", { value: k, selected: filters.cat === k }, v)));
   const qIn = h("input", { type: "search", placeholder: "بحث في العناوين", value: filters.q, maxlength: "100" });
   const apply = () => articles({ status: statusSel.value, cat: catSel.value, q: qIn.value.trim() }).catch((e) => toast(friendlyError(e)));
-  const upd = async (id, patch, msg) => { must(await sb.from("articles").update(patch).eq("id", id)); toast(msg); apply(); };
+  const upd = async (id, patch, msg) => { must(await sb.from("news_articles").update(patch).eq("id", id)); toast(msg); apply(); };
   const breakingActive = (a) => a.is_breaking && new Date(a.breaking_until) > new Date();
   body().replaceChildren(
     h("div", { class: "toolbar" }, qIn, statusSel, catSel, h("button", { class: "btn btn-primary", type: "button", onclick: apply }, "تصفية")),
@@ -112,14 +112,14 @@ function editDialog(a, after) {
       const title = t.value.trim();
       if (title.length < 3) return toast("العنوان قصير جداً");
       try {
-        must(await sb.from("articles").update({ title, summary: s.value.trim() || null, verification: v.value, category: c.value, categories, editor_note: note.value.trim() || null }).eq("id", a.id));
+        must(await sb.from("news_articles").update({ title, summary: s.value.trim() || null, verification: v.value, category: c.value, categories, editor_note: note.value.trim() || null }).eq("id", a.id));
         d.close(); toast("حُفظ التعديل"); after();
       } catch (e) { toast(e.message.includes("HTML") ? "لا يُسمح بوسوم HTML" : friendlyError(e)); }
     } }, "حفظ"));
 }
 
 async function historyDialog(a) {
-  const rows = must(await sb.from("article_history").select("*").eq("article_id", a.id).order("created_at", { ascending: false }).limit(50));
+  const rows = must(await sb.from("news_article_history").select("*").eq("article_id", a.id).order("created_at", { ascending: false }).limit(50));
   dialog("سجل التعديلات", rows.length ? h("ul", { class: "mini-list" }, rows.map((r) => h("li", {},
     h("span", { class: "t num" }, full(r.created_at)),
     Object.keys(r.new_values || {}).map((k) => h("div", { class: "note" }, `${k}: ${JSON.stringify(r.old_values?.[k])} ← ${JSON.stringify(r.new_values[k])}`)))))
@@ -128,8 +128,8 @@ async function historyDialog(a) {
 
 /* ---------------- sources ---------------- */
 async function sources() {
-  const rows = must(await sb.rpc("admin_sources"));
-  const save = async (id, patch) => { try { must(await sb.from("sources").update(patch).eq("id", id)); toast("حُفظ"); } catch (e) { toast(/check/.test(e.message) ? "قيمة غير مسموحة (الفترة أقل من الحد الأدنى؟)" : friendlyError(e)); } };
+  const rows = must(await sb.rpc("news_admin_sources"));
+  const save = async (id, patch) => { try { must(await sb.from("news_sources").update(patch).eq("id", id)); toast("حُفظ"); } catch (e) { toast(/check/.test(e.message) ? "قيمة غير مسموحة (الفترة أقل من الحد الأدنى؟)" : friendlyError(e)); } };
   body().replaceChildren(
     h("div", { class: "toolbar" }, h("button", { class: "btn btn-primary", type: "button", onclick: addSourceDialog }, "إضافة مصدر"),
       h("span", { class: "note" }, "الفترة بالدقائق؛ لا يمكن أن تقل عن الحد الأدنى المسجل لشروط المصدر.")),
@@ -173,7 +173,7 @@ function addSourceDialog() {
       const v = Object.fromEntries(new FormData(form));
       const row = { ...v, default_category: v.default_category || null, reliability: Number(v.reliability), poll_interval_minutes: Number(v.poll_interval_minutes), tz_offset_minutes: Number(v.tz_offset_minutes || 0), min_interval_minutes: 3, enabled: true };
       if (!/^https:\/\//.test(row.homepage)) return toast("يجب أن يبدأ الموقع بـ https://");
-      try { must(await sb.from("sources").insert(row)); d.close(); toast("أُضيف المصدر — سيُجلب في التشغيل القادم"); go("sources"); }
+      try { must(await sb.from("news_sources").insert(row)); d.close(); toast("أُضيف المصدر — سيُجلب في التشغيل القادم"); go("sources"); }
       catch (e) { toast(/duplicate|unique/.test(e.message) ? "المصدر موجود مسبقاً" : /check/.test(e.message) ? "قيمة غير صالحة" : friendlyError(e)); }
     } }, "إضافة"));
 }
@@ -182,9 +182,9 @@ function addSourceDialog() {
 async function logs() {
   const since = new Date(Date.now() - 48 * 3600_000).toISOString();
   const [errs, runs, srcs] = await Promise.all([
-    sb.from("fetch_logs").select("*").in("status", ["error", "blocked"]).gt("started_at", since).order("started_at", { ascending: false }).limit(100).then(must),
-    sb.from("ingest_runs").select("*").order("started_at", { ascending: false }).limit(40).then(must),
-    sb.from("sources").select("id,name_ar").then(must),
+    sb.from("news_fetch_logs").select("*").in("status", ["error", "blocked"]).gt("started_at", since).order("started_at", { ascending: false }).limit(100).then(must),
+    sb.from("news_ingest_runs").select("*").order("started_at", { ascending: false }).limit(40).then(must),
+    sb.from("news_sources").select("id,name_ar").then(must),
   ]);
   const name = new Map(srcs.map((s) => [s.id, s.name_ar]));
   body().replaceChildren(
@@ -205,7 +205,7 @@ async function logs() {
 
 /* ---------------- settings ---------------- */
 async function settings() {
-  const rows = must(await sb.from("settings").select("key,value,description,updated_at").order("key"));
+  const rows = must(await sb.from("news_settings").select("key,value,description,updated_at").order("key"));
   body().replaceChildren(h("div", { class: "table-wrap" }, h("table", {}, h("tbody", {}, rows.filter((r) => r.key !== "owner_email").map((r) => {
     const input = h("input", { value: JSON.stringify(r.value), dir: "ltr", style: "width:160px" });
     return h("tr", {},
@@ -213,21 +213,21 @@ async function settings() {
       h("td", {}, input),
       h("td", {}, h("button", { class: "btn btn-primary", type: "button", onclick: async () => {
         let value; try { value = JSON.parse(input.value); } catch { return toast("قيمة JSON غير صالحة (أرقام، true/false، أو نص بين علامتي تنصيص)"); }
-        try { must(await sb.from("settings").update({ value }).eq("key", r.key)); toast("حُفظ"); } catch (e) { toast(friendlyError(e)); }
+        try { must(await sb.from("news_settings").update({ value }).eq("key", r.key)); toast("حُفظ"); } catch (e) { toast(friendlyError(e)); }
       } }, "حفظ")));
   })))), h("p", { class: "note" }, "ingest_enabled=false يوقف الجلب بالكامل. فترة المجدول الفعلية تُضبط في pg_cron (انظر دليل الإعداد)."));
 }
 
 /* ---------------- editors ---------------- */
 async function editors() {
-  const rows = must(await sb.from("admins").select("user_id,role,created_at"));
+  const rows = must(await sb.from("news_admins").select("user_id,role,created_at"));
   const email = h("input", { type: "email", placeholder: "بريد المحرر (بعد أن ينشئ حساباً)", dir: "ltr" });
   body().replaceChildren(
     h("p", {}, `دورك: ${role === "owner" ? "مالك" : "محرر"}. المالك وحده يضيف المحررين.`),
     h("div", { class: "table-wrap" }, h("table", {}, h("tbody", {}, rows.map((r) => h("tr", {}, h("td", { dir: "ltr" }, r.user_id), h("td", {}, r.role === "owner" ? "مالك" : "محرر"), h("td", { class: "num" }, full(r.created_at))))))),
     role === "owner" ? h("div", { class: "toolbar", style: "margin-top:16px" }, email, h("button", { class: "btn btn-primary", type: "button", onclick: async () => {
       try {
-        const r = must(await sb.rpc("add_admin_by_email", { p_email: email.value, p_role: "editor" }));
+        const r = must(await sb.rpc("news_add_admin_by_email", { p_email: email.value, p_role: "editor" }));
         toast(r === "ok" ? "أُضيف المحرر" : "لا يوجد حساب بهذا البريد — اطلب منه التسجيل أولاً"); go("editors");
       } catch (e) { toast(friendlyError(e)); }
     } }, "إضافة محرر")) : null);
@@ -260,9 +260,9 @@ async function start() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return loginView();
   me = session.user;
-  const mine = must(await sb.from("admins").select("role").eq("user_id", me.id).maybeSingle());
+  const mine = must(await sb.from("news_admins").select("role").eq("user_id", me.id).maybeSingle());
   if (!mine) {
-    const claimed = await sb.rpc("claim_first_owner");
+    const claimed = await sb.rpc("news_claim_first_owner");
     if (claimed.data === true) { toast("أصبحت مالك الموقع"); return start(); }
     return root.replaceChildren(h("div", { class: "login-box" }, h("h1", {}, "لا صلاحية"),
       h("p", {}, `الحساب ${me.email} ليس محرراً معتمداً. اطلب من مالك الموقع إضافتك.`),

@@ -38,8 +38,8 @@ This guide takes the platform from an empty Supabase project to a running site, 
    `20261017000001_schema.sql` → `…02_security.sql` → `…03_functions.sql` → `…04_seed.sql` → `…06_sources.sql`.
 3. Deploy the Edge Functions **with JWT verification off** (they verify the Vault token themselves):
    ```bash
-   supabase functions deploy ingest --no-verify-jwt
-   supabase functions deploy notify --no-verify-jwt
+   supabase functions deploy news-ingest --no-verify-jwt
+   supabase functions deploy news-notify --no-verify-jwt
    ```
 4. Apply the scheduler with your project URL filled in:
    ```bash
@@ -141,7 +141,7 @@ select * from alerts where resolved_at is null;
 
 ## 5. Tests
 ```bash
-(cd supabase/functions/ingest && deno test -A tests/)          # 30 pipeline tests
+(cd supabase/functions/news-ingest && deno test -A tests/)          # 30 pipeline tests
 PGHOST=… PGPORT=… tests/run-sql-tests.sh                        # 75+ DB/RLS tests on a throwaway Postgres
 node tests/ui/smoke.mjs <site-dir> <out-dir>                    # 60 browser checks against a mocked API
 ```

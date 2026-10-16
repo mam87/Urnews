@@ -55,11 +55,11 @@ async function mock(page) {
     const json = (b, s = 200) => route.fulfill({ status: s, contentType: "application/json", body: JSON.stringify(b), headers: { "access-control-allow-origin": "*" } });
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
     if (u.pathname.startsWith("/realtime")) return route.abort();
-    if (u.pathname === "/rest/v1/sources") return json(sources);
-    if (u.pathname === "/rest/v1/clusters") return json([{ id: 9, source_count: 2 }]);
-    if (u.pathname === "/rest/v1/rpc/site_status") return json({ last_run_at: iso(1), sources_active: 2, sources_healthy: 1, articles_24h: articles.length, interval_minutes: 2 });
-    if (u.pathname === "/rest/v1/rpc/search_articles") return json(articles.filter((a) => a.title.includes("زلزال")));
-    if (u.pathname === "/rest/v1/articles") {
+    if (u.pathname === "/rest/v1/news_sources") return json(sources);
+    if (u.pathname === "/rest/v1/news_clusters") return json([{ id: 9, source_count: 2 }]);
+    if (u.pathname === "/rest/v1/rpc/news_site_status") return json({ last_run_at: iso(1), sources_active: 2, sources_healthy: 1, articles_24h: articles.length, interval_minutes: 2 });
+    if (u.pathname === "/rest/v1/rpc/news_search_articles") return json(articles.filter((a) => a.title.includes("زلزال")));
+    if (u.pathname === "/rest/v1/news_articles") {
       if (failArticles) return json({ message: "boom" }, 500);
       let rows = emptyMode ? [] : [...articles];
       const p = u.searchParams;
