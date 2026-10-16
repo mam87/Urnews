@@ -1,0 +1,26 @@
+name: healthcheck
+# Independent watchdog outside Supabase: every 30 minutes it asks the public site_status()
+# endpoint whether ingestion succeeded recently. If not, the workflow fails and GitHub
+# e-mails the repository owner (free alerting; no extra service needed).
+# The regular API traffic also helps keep a free-tier project from being paused for inactivity.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query site_status
+        run: |
+          URL=$(sed -n 's/.*SUPABASE_URL = "\(.*\)".*/\1/p' assets/js/config.js)
+          KEY=$(sed -n 's/.*SUPABASE_ANON_KEY = "\(.*\)".*/\1/p' assets/js/config.js)
+          case "$URL" in __*) echo "site not configured yet"; exit 0;; esac
+          OUT=$(curl -fsS -X POST "$URL/rest/v1/rpc/site_status" -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{}')
+          echo "$OUT"
+          LAST=$(echo "$OUT" | jq -r .last_run_at)
+          test "$LAST" != "null" || { echo "::error::ingestion has never succeeded"; exit 1; }
+          AGE=$(( $(date -u +%s) - $(date -u -d "$LAST" +%s) ))
+          echo "last successful ingest ${AGE}s ago"
+          test $AGE -lt 1800 || { echo "::error::ingestion stalled for ${AGE}s"; exit 1; }

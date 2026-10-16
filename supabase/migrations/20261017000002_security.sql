@@ -143,18 +143,21 @@ end $$;
 create trigger articles_audit after update on public.articles
   for each row execute function public.articles_audit();
 
--- Owner bootstrap: the first signed-in user who calls this becomes owner,
--- but ONLY while no owner exists yet. Afterwards it is a no-op.
+-- Owner bootstrap: the signed-in user whose e-mail equals settings.owner_email becomes owner,
+-- only while no owner exists. Prevents a stranger who signs up first from taking over.
 create or replace function public.claim_first_owner()
 returns boolean language plpgsql security definer set search_path = '' as $$
-declare uid uuid := (select auth.uid());
+declare
+  uid uuid := (select auth.uid());
+  want text := (select value #>> '{}' from public.settings where key = 'owner_email');
+  mine text;
 begin
-  if uid is null then return false; end if;
+  if uid is null or coalesce(want, '') = '' then return false; end if;
+  select email into mine from auth.users where id = uid;
+  if lower(coalesce(mine, '')) <> lower(want) then return false; end if;
   lock table public.admins in exclusive mode;
   if exists (select 1 from public.admins where role = 'owner') then return false; end if;
-  if (select value from public.settings where key = 'allow_owner_claim') is distinct from 'true'::jsonb then return false; end if;
   insert into public.admins (user_id, role) values (uid, 'owner');
-  update public.settings set value = 'false'::jsonb where key = 'allow_owner_claim';
   return true;
 end $$;
 grant execute on function public.claim_first_owner() to authenticated;

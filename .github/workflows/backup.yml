@@ -1,0 +1,35 @@
+name: nightly-backup
+# Free-plan Supabase projects have no downloadable backups, so this job dumps the
+# database every night and keeps it as a private workflow artifact for 30 days.
+# Requires repository secret SUPABASE_DB_URL (Session pooler connection string, port 5432).
+on:
+  schedule:
+    - cron: "40 23 * * *"   # 02:40 Amman time
+  workflow_dispatch:
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secret
+        env: { DB: "${{ secrets.SUPABASE_DB_URL }}" }
+        run: test -n "$DB" || { echo "::error::Add SUPABASE_DB_URL in Settings → Secrets → Actions"; exit 1; }
+      - name: Install pg_dump 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+      - name: Dump
+        env: { DB: "${{ secrets.SUPABASE_DB_URL }}" }
+        run: |
+          mkdir -p out
+          STAMP=$(date -u +%Y%m%dT%H%MZ)
+          # 1) configuration + editorial data (small, most valuable)
+          /usr/lib/postgresql/17/bin/pg_dump "$DB" --data-only --no-owner \
+            -t public.categories -t public.sources -t public.settings -t public.admins \
+            -t public.article_history -f out/config-$STAMP.sql
+          # 2) full public schema + data (articles can also be re-fetched from feeds)
+          /usr/lib/postgresql/17/bin/pg_dump "$DB" --schema=public --no-owner -Fc -f out/full-$STAMP.dump
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with: { name: db-backup, path: out/, retention-days: 30 }

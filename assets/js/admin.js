@@ -206,7 +206,7 @@ async function logs() {
 /* ---------------- settings ---------------- */
 async function settings() {
   const rows = must(await sb.from("settings").select("key,value,description,updated_at").order("key"));
-  body().replaceChildren(h("div", { class: "table-wrap" }, h("table", {}, h("tbody", {}, rows.filter((r) => r.key !== "allow_owner_claim").map((r) => {
+  body().replaceChildren(h("div", { class: "table-wrap" }, h("table", {}, h("tbody", {}, rows.filter((r) => r.key !== "owner_email").map((r) => {
     const input = h("input", { value: JSON.stringify(r.value), dir: "ltr", style: "width:160px" });
     return h("tr", {},
       h("td", {}, h("b", { dir: "ltr" }, r.key), h("span", { class: "sub" }, r.description || "")),

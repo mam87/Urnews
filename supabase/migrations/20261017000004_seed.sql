@@ -25,6 +25,6 @@ insert into public.settings (key, value, description, is_public) values
   ('stall_alert_minutes',        '15',    'تنبيه المسؤول إذا توقف الجلب لهذه المدة', false),
   ('ai_daily_limit',             '300',   'أقصى عدد استدعاءات ذكاء اصطناعي يومياً (حد إنفاق)', false),
   ('ai_summarize',               'false', 'تلخيص الأخبار العربية بالذكاء الاصطناعي (الترجمة تعمل دائماً إن توفر مفتاح)', false),
-  ('allow_owner_claim',          'true',  'يسمح لأول مستخدم بالمطالبة بدور المالك ثم يُغلق تلقائياً', false),
+  ('owner_email',                '""',    'بريد المالك: أول دخول بهذا البريد يحصل على دور المالك (مرة واحدة)', false),
   ('site_name',                  '"نبض الأخبار"', 'اسم الموقع', true)
 on conflict (key) do nothing;

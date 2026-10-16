@@ -134,7 +134,10 @@ async function loadInitial() {
 async function loadLead() {
   if (q) return;
   const since = new Date(Date.now() - 12 * 3600_000).toISOString();
-  const { data, error } = await baseQuery().gt("published_at", since).order("published_at", { ascending: false }).limit(150);
+  let lq = sb.from("articles").select("id,source_id,title,summary,category,published_at,cluster_id,verification,is_breaking,breaking_until,importance,pinned")
+    .eq("status", "published").is("duplicate_of", null).gt("published_at", since);
+  if (cat) lq = lq.contains("categories", [cat]);
+  const { data, error } = await lq.order("importance", { ascending: false }).order("published_at", { ascending: false }).limit(60);
   if (error || !data?.length) { leadSlot.replaceChildren(); return; }
   await loadClusterSizes(data);
   const seen = new Set();

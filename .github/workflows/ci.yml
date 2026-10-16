@@ -1,0 +1,31 @@
+name: tests
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_PASSWORD: postgres }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with: { deno-version: v2.x }
+      - name: Ingest pipeline unit tests (parsing, dedup, time zones, backoff, AI guard rails)
+        working-directory: supabase/functions/ingest
+        run: deno test -A tests/
+      - name: Type-check edge functions
+        run: |
+          (cd supabase/functions/ingest && deno check index.ts)
+          (cd supabase/functions/notify && deno check index.ts)
+      - name: Database tests (RLS, permissions, dedup, scheduler lease, alerts, search)
+        env: { PGHOST: localhost, PGPORT: 5432, PGUSER: postgres, PGPASSWORD: postgres }
+        run: |
+          sudo apt-get install -y postgresql-client >/dev/null
+          tests/run-sql-tests.sh | tee /tmp/out.txt
+          ! grep -q "FAIL" /tmp/out.txt
+          test "$(grep -c '^  ok -' /tmp/out.txt)" -ge 70

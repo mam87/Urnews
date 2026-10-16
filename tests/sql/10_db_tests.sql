@@ -110,6 +110,7 @@ select pg_temp.fails($$select public.check_ingest_token('x')$$, 'anon cannot pro
 select pg_temp.fails($$select public.watchdog()$$, 'anon cannot run watchdog');
 select pg_temp.fails($$select public.admin_stats()$$, 'anon cannot read admin stats');
 select pg_temp.ok((select count(*) from public.settings) = (select count(*) from public.settings where is_public), 'anon sees only public settings');
+select pg_temp.ok(not exists (select 1 from public.settings where key = 'owner_email'), 'owner e-mail is not public');
 select pg_temp.ok((select count(*) from public.search_articles('الحكومه', null, 10, null)) = 2, 'search is normalisation-insensitive (ة/ه)');
 select pg_temp.ok((select count(*) from public.search_articles('خدمة مدنية', 'jordan', 10, null)) = 2, 'multi-term search with category filter');
 select pg_temp.ok((select count(*) from public.search_articles('قيد المراجعة', null, 10, null)) = 0, 'search never returns unpublished');
@@ -126,12 +127,18 @@ select pg_temp.fails($$select public.admin_stats()$$, 'non-admin cannot read adm
 select pg_temp.fails($$select public.admin_sources()$$, 'non-admin cannot read admin sources');
 select pg_temp.fails($$insert into public.admins (user_id, role) values ('00000000-0000-0000-0000-00000000000b', 'owner')$$, 'non-admin cannot self-promote');
 reset role;
--- claim_first_owner: first caller becomes owner, then it is closed for everyone
+-- claim_first_owner: only the configured owner e-mail, only once
 set role authenticated;
-set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
-select pg_temp.ok(public.claim_first_owner(), 'first user claims owner');
 set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
+select pg_temp.ok(not public.claim_first_owner(), 'claim refused while owner_email is unset');
+reset role;
+update public.settings set value = '"Owner@Example.com"' where key = 'owner_email';
+set role authenticated;
+select pg_temp.ok(not public.claim_first_owner(), 'stranger who signed up cannot claim owner');
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000a';
+select pg_temp.ok(public.claim_first_owner(), 'configured owner e-mail claims owner (case-insensitive)');
 select pg_temp.ok(not public.claim_first_owner(), 'second claim refused');
+set request.jwt.claim.sub = '00000000-0000-0000-0000-00000000000b';
 select pg_temp.fails($$select public.add_admin_by_email('random@example.com', 'owner')$$, 'non-owner cannot add admins');
 
 -- owner / editor ------------------------------------------------------------
