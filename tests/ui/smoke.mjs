@@ -19,7 +19,7 @@ const server = http.createServer((req, res) => {
   if (!f.startsWith(siteDir) || !fs.existsSync(f)) { res.writeHead(404); return res.end("nf"); }
   const type = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".svg": "image/svg+xml" }[path.extname(f)] || "application/octet-stream";
   let body = fs.readFileSync(f);
-  if (p.endsWith("config.js")) body = Buffer.from(String(body).replace("__SUPABASE_URL__", API).replace("__SUPABASE_ANON_KEY__", "test-anon-key"));
+  if (p.endsWith("config.js")) body = Buffer.from(String(body).replace(/export const SUPABASE_URL = ".*";/, `export const SUPABASE_URL = "${API}";`).replace("__SUPABASE_ANON_KEY__", "test-anon-key"));
   res.writeHead(200, { "content-type": type });
   res.end(body);
 });

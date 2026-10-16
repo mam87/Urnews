@@ -236,7 +236,7 @@ async function editors() {
 /* ---------------- auth ---------------- */
 function loginView(msg = "") {
   const email = h("input", { type: "email", required: true, autocomplete: "username", dir: "ltr" });
-  const pw = h("input", { type: "password", required: true, minlength: "10", autocomplete: "current-password", dir: "ltr" });
+  const pw = h("input", { type: "password", required: true, autocomplete: "current-password", dir: "ltr" });
   const out = h("p", { class: "note", role: "alert" }, msg);
   const form = h("form", {}, h("label", { class: "field" }, "البريد الإلكتروني", email), h("label", { class: "field" }, "كلمة المرور", pw),
     h("div", { class: "toolbar" },
@@ -245,7 +245,13 @@ function loginView(msg = "") {
         if (!form.reportValidity()) return;
         const { error } = await sb.auth.signUp({ email: email.value, password: pw.value, options: { emailRedirectTo: location.href } });
         out.textContent = error ? (/disabled|not allowed/i.test(error.message) ? "التسجيل مغلق. اطلب من المالك إنشاء حساب لك." : error.message) : "تم إنشاء الحساب. إن طُلب تأكيد البريد فافتح الرابط المرسل ثم سجّل الدخول.";
-      } }, "إنشاء حساب")), out);
+      } }, "إنشاء حساب"),
+      h("button", { class: "btn", type: "button", onclick: async () => {
+        if (!email.reportValidity()) return;
+        const { error } = await sb.auth.resetPasswordForEmail(email.value, { redirectTo: location.origin + location.pathname });
+        out.textContent = error ? (/rate|many|seconds/i.test(error.message) ? "انتظر دقيقة ثم حاول مرة أخرى." : error.message)
+          : "إذا كان البريد مسجلاً فستصلك رسالة فيها رابط لتعيين كلمة مرور جديدة. افتح الرابط من نفس الجهاز.";
+      } }, "نسيت كلمة المرور")), out);
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     const { error } = await sb.auth.signInWithPassword({ email: email.value, password: pw.value });
@@ -255,14 +261,37 @@ function loginView(msg = "") {
   root.replaceChildren(h("div", { class: "login-box" }, h("h1", {}, "دخول المحررين"), h("p", { class: "note" }, "الوصول مقصور على المحررين المعتمدين. الصلاحيات تُفحص في الخادم."), form));
 }
 
+function newPasswordView() {
+  const pw = h("input", { type: "password", required: true, minlength: "10", autocomplete: "new-password", dir: "ltr" });
+  const pw2 = h("input", { type: "password", required: true, minlength: "10", autocomplete: "new-password", dir: "ltr" });
+  const out = h("p", { class: "note", role: "alert" });
+  const form = h("form", {}, h("label", { class: "field" }, "كلمة المرور الجديدة (10 أحرف على الأقل)", pw), h("label", { class: "field" }, "تأكيد كلمة المرور", pw2),
+    h("button", { class: "btn btn-primary", type: "submit" }, "حفظ كلمة المرور"), out);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (pw.value !== pw2.value) { out.textContent = "كلمتا المرور غير متطابقتين."; return; }
+    const { error } = await sb.auth.updateUser({ password: pw.value });
+    if (error) { out.textContent = /weak|short|length/i.test(error.message) ? "كلمة المرور ضعيفة أو قصيرة." : error.message; return; }
+    history.replaceState(null, "", location.pathname);
+    toast("تم تغيير كلمة المرور");
+    start();
+  });
+  root.replaceChildren(h("div", { class: "login-box" }, h("h1", {}, "تعيين كلمة مرور جديدة"), form));
+}
+
+let recovering = /type=recovery/.test(location.hash);
+if (configured) sb.auth.onAuthStateChange((event) => { if (event === "PASSWORD_RECOVERY") { recovering = true; newPasswordView(); } });
+
 async function start() {
   if (!configured) return notConfiguredState(root);
+  if (recovering) { const { data } = await sb.auth.getSession(); return data.session ? newPasswordView() : loginView("انتهت صلاحية رابط الاستعادة. اطلب رابطاً جديداً."); }
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return loginView();
   me = session.user;
   const mine = must(await sb.from("news_admins").select("role").eq("user_id", me.id).maybeSingle());
   if (!mine) {
     const claimed = await sb.rpc("news_claim_first_owner");
+    if (claimed.error) console.error(claimed.error);
     if (claimed.data === true) { toast("أصبحت مالك الموقع"); return start(); }
     return root.replaceChildren(h("div", { class: "login-box" }, h("h1", {}, "لا صلاحية"),
       h("p", {}, `الحساب ${me.email} ليس محرراً معتمداً. اطلب من مالك الموقع إضافتك.`),
