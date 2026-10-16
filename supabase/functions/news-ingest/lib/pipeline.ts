@@ -32,6 +32,7 @@ export interface Db {
   similar(titles: string[]): Promise<SimilarRow[]>;
   insertArticles(rows: Record<string, unknown>[]): Promise<number>;
   aiTake(n: number): Promise<number>;
+  backfillImages?(rows: { url_hash: string; image_url: string }[]): Promise<number>;
   finishRun(runId: number, stats: Record<string, unknown>): Promise<void>;
 }
 
@@ -314,6 +315,12 @@ export async function runIngest(deps: Deps) {
 
     // Exact duplicates (by canonical URL hash)
     const existing = all.length ? await deps.db.existingHashes([...new Set(all.map((c) => c.hash))]) : new Set<string>();
+    // Articles we already have: fill in a thumbnail if the feed now provides one (never overwrite).
+    if (deps.db.backfillImages) {
+      const imgs = all.filter((c) => existing.has(c.hash) && c.item.image?.startsWith("https://"))
+        .map((c) => ({ url_hash: c.hash, image_url: c.item.image as string }));
+      if (imgs.length) await deps.db.backfillImages(imgs.slice(0, 200)).catch((e) => log("backfill failed", (e as Error).message));
+    }
     const seen = new Set<string>();
     let fresh = all.filter((c) => {
       if (existing.has(c.hash) || seen.has(c.hash)) return false;

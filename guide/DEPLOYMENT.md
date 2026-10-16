@@ -5,7 +5,7 @@
   functions and permissions are untouched (verified: anon can still read LabGram tables).
 * **Edge Functions:** `news-ingest`, `news-notify` (JWT verification off; protected by the Vault token).
   The deployed entrypoint imports `lib/*.ts` from this repository pinned to commit
-  `7f912baf017de3a114e018df8eceed1bf2210e9b`, so the running code is exactly the tested code.
+  `30d530a43b1368e7a75b504d4ed135bd665cefbe`, so the running code is exactly the tested code.
   To deploy a new version: push, then redeploy with the new commit SHA in the import URLs
   (or run `scripts/build-functions.sh` and deploy the single-file bundle with the Supabase CLI).
 * **Scheduler:** pg_cron `news-ingest` every 2 min, `news-watchdog` every 5 min.

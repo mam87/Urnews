@@ -52,6 +52,11 @@ class FakeDb implements Db {
     return n;
   }
   async aiTake(n: number) { return n; }
+  async backfillImages(rows: { url_hash: string; image_url: string }[]) {
+    let n = 0;
+    for (const r of rows) { const a = this.articles.find((x) => x.url_hash === r.url_hash && !x.image_url); if (a) { a.image_url = r.image_url; n++; } }
+    return n;
+  }
   async finishRun(_id: number, s: Record<string, unknown>) { this.finished.push(s); }
 }
 
@@ -209,4 +214,18 @@ Deno.test("pipeline: AI translation path with validation (mocked provider)", asy
   assertEquals(art.title_original, "Jordan opens new solar plant");
   assertEquals(art.translated, true);
   assertEquals(art.summary_kind, "ai");
+});
+
+Deno.test("pipeline: existing articles get a thumbnail later, never overwritten", async () => {
+  const db = new FakeDb();
+  db.sources = [src(1, "alpha")];
+  const item = (img?: string) => `<rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>خبر يحصل على صورة لاحقاً</title><link>https://alpha.example/p</link>${img ? `<media:content url="${img}" medium="image"/>` : ""}</item></channel></rss>`;
+  const run = async (body: string) => { const { f } = mockFetch({ "https://alpha.example/rss": () => new Response(body) }); await runIngest({ fetch: f, db, ai: noAI, now: () => NOW, sleep }); };
+  await run(item());
+  assertEquals(db.articles[0].image_url, null);
+  await run(item("https://img.example/1.jpg"));
+  assertEquals(db.articles[0].image_url, "https://img.example/1.jpg");
+  await run(item("https://img.example/2.jpg"));
+  assertEquals(db.articles[0].image_url, "https://img.example/1.jpg");
+  assertEquals(db.articles.length, 1);
 });
