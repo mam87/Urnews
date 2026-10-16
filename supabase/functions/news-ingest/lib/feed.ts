@@ -8,6 +8,8 @@ export interface FeedItem {
   url: string;
   title: string;
   description: string;
+  /** Plain text of the full-content field (content:encoded / atom content), if the feed provides one. */
+  content: string;
   publishedAt: Date | null;
   image: string | null;
   categories: string[];
@@ -148,6 +150,7 @@ export function parseFeed(body: string, feedUrl: string, assumeOffsetMinutes = 0
         url: link || "",
         title: stripHtml(text(n["title"])),
         description: stripHtml(text(n["description"]) || html),
+        content: stripHtml(text(n["content:encoded"])),
         publishedAt: parseDate(n["pubDate"] ?? n["dc:date"] ?? n["published"] ?? n["updated"], assumeOffsetMinutes),
         image: pickImage(n, html, feedUrl),
         categories: arr(n["category"]).map((c) => stripHtml(text(c))).filter(Boolean),
@@ -164,6 +167,7 @@ export function parseFeed(body: string, feedUrl: string, assumeOffsetMinutes = 0
         url: link || "",
         title: stripHtml(text(n["title"])),
         description: stripHtml(text(n["summary"]) || html),
+        content: stripHtml(text(n["content"])),
         publishedAt: parseDate(n["published"] ?? n["updated"], assumeOffsetMinutes),
         image: pickImage(n, html, feedUrl),
         categories: arr(n["category"] as Record<string, unknown>[]).map((c) => stripHtml(String(c?.["@_term"] ?? text(c)))).filter(Boolean),
@@ -186,6 +190,7 @@ function parseJsonFeed(body: string, feedUrl: string, off: number): FeedItem[] {
       url,
       title: stripHtml(n.title),
       description: stripHtml(n.summary ?? n.content_text ?? n.content_html ?? ""),
+      content: stripHtml(n.content_text ?? n.content_html ?? ""),
       publishedAt: parseDate(n.date_published ?? n.date_modified, off),
       image: safeUrl(n.image ?? n.banner_image, feedUrl),
       categories: Array.isArray(n.tags) ? (n.tags as unknown[]).map((t) => stripHtml(t)) : [],

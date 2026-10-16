@@ -58,6 +58,8 @@ export function safeHref(u) {
 const TZ = "Asia/Amman";
 const fmtTime = new Intl.DateTimeFormat("ar-JO-u-nu-latn", { timeZone: TZ, hour: "numeric", minute: "2-digit", hour12: true });
 const fmtDate = new Intl.DateTimeFormat("ar-JO-u-nu-latn", { timeZone: TZ, weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const fmtLongToday = new Intl.DateTimeFormat("ar-JO-u-nu-latn", { timeZone: TZ, weekday: "long", day: "numeric", month: "long", year: "numeric" });
+export const todayLabel = () => fmtLongToday.format(new Date());
 const fmtShortDate = new Intl.DateTimeFormat("ar-JO-u-nu-latn", { timeZone: TZ, day: "numeric", month: "short" });
 const fmtFull = new Intl.DateTimeFormat("ar-JO-u-nu-latn", { timeZone: TZ, dateStyle: "medium", timeStyle: "short", hour12: true });
 const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
@@ -92,16 +94,35 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* storage unavailable */ } },
 };
 export { store };
+/* ---------- reader preferences (stored only in this browser) ---------- */
+export const FONT_STEPS = [["0.9", "صغير"], ["1", "عادي"], ["1.12", "كبير"], ["1.25", "كبير جداً"], ["1.4", "ضخم"]];
+const DEFAULT_PREFS = { theme: "auto", fs: "1", noimg: false, motion: "auto", density: "comfy" };
+export function getPrefs() {
+  let p = {};
+  try { p = JSON.parse(store.get("nabd-prefs") || "{}") || {}; } catch { p = {}; }
+  const legacy = store.get("nabd-theme");
+  if (!p.theme && (legacy === "dark" || legacy === "light")) p.theme = legacy;
+  return { ...DEFAULT_PREFS, ...p };
+}
+export function applyPrefs(p = getPrefs()) {
+  const r = document.documentElement;
+  if (p.theme === "dark" || p.theme === "light") r.dataset.theme = p.theme; else delete r.dataset.theme;
+  r.style.setProperty("--fs", FONT_STEPS.some(([v]) => v === String(p.fs)) ? String(p.fs) : "1");
+  if (p.noimg) r.dataset.noimg = "1"; else delete r.dataset.noimg;
+  if (p.motion === "reduce") r.dataset.motion = "reduce"; else delete r.dataset.motion;
+  if (p.density === "compact") r.dataset.density = "compact"; else delete r.dataset.density;
+}
+export function setPrefs(patch) {
+  const p = { ...getPrefs(), ...patch };
+  store.set("nabd-prefs", JSON.stringify(p));
+  applyPrefs(p);
+  return p;
+}
 export function initTheme() {
-  const saved = store.get("nabd-theme");
-  if (saved === "dark" || saved === "light") document.documentElement.dataset.theme = saved;
-  const btn = document.getElementById("theme-toggle");
-  btn?.addEventListener("click", () => {
-    const cur = document.documentElement.dataset.theme
-      || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-    const next = cur === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    store.set("nabd-theme", next);
+  applyPrefs();
+  document.getElementById("theme-toggle")?.addEventListener("click", () => {
+    const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    setPrefs({ theme: cur === "dark" ? "light" : "dark" });
   });
 }
 

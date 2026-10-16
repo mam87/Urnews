@@ -52,9 +52,14 @@ class FakeDb implements Db {
     return n;
   }
   async aiTake(n: number) { return n; }
-  async backfillImages(rows: { url_hash: string; image_url: string }[]) {
+  async backfillImages(rows: { url_hash: string; image_url: string | null; summary: string | null }[]) {
     let n = 0;
-    for (const r of rows) { const a = this.articles.find((x) => x.url_hash === r.url_hash && !x.image_url); if (a) { a.image_url = r.image_url; n++; } }
+    for (const r of rows) {
+      const a = this.articles.find((x) => x.url_hash === r.url_hash);
+      if (!a) continue;
+      if (!a.image_url && r.image_url) { a.image_url = r.image_url; n++; }
+      if (r.summary && r.summary.length > String(a.summary ?? "").length + 40) a.summary = r.summary;
+    }
     return n;
   }
   async finishRun(_id: number, s: Record<string, unknown>) { this.finished.push(s); }
@@ -228,4 +233,26 @@ Deno.test("pipeline: existing articles get a thumbnail later, never overwritten"
   await run(item("https://img.example/2.jpg"));
   assertEquals(db.articles[0].image_url, "https://img.example/1.jpg");
   assertEquals(db.articles.length, 1);
+});
+
+Deno.test("bestExcerpt: prefers longer publisher content, strips repeated headline, caps length", async () => {
+  const { bestExcerpt, EXCERPT_MAX } = await import("../lib/pipeline.ts");
+  const base = { guid: "g", url: "https://x/1", publishedAt: null, image: null, categories: [] };
+  const long = "الفقرة الأولى من الخبر. ".repeat(60);
+  const e1 = bestExcerpt({ ...base, title: "عنوان الخبر", description: "وصف قصير", content: "عنوان الخبر: " + long });
+  assert(e1.startsWith("الفقرة الأولى"), "headline removed");
+  assert(e1.length <= EXCERPT_MAX + 1 && e1.endsWith("…"), "capped at excerpt length");
+  assertEquals(bestExcerpt({ ...base, title: "ع", description: "وصف جيد كاف", content: "" }), "وصف جيد كاف");
+  assertEquals(bestExcerpt({ ...base, title: "نفس", description: "نفس", content: "" }), "");
+});
+
+Deno.test("pipeline: existing article gets a longer excerpt later", async () => {
+  const db = new FakeDb();
+  db.sources = [src(1, "alpha")];
+  const feed = (d: string, c = "") => `<rss xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><item><title>خبر يتوسع لاحقاً</title><link>https://alpha.example/q</link><description>${d}</description>${c ? `<content:encoded><![CDATA[<p>${c}</p>]]></content:encoded>` : ""}</item></channel></rss>`;
+  const run = async (body: string) => { const { f } = mockFetch({ "https://alpha.example/rss": () => new Response(body) }); await runIngest({ fetch: f, db, ai: noAI, now: () => NOW, sleep }); };
+  await run(feed("وصف قصير جداً"));
+  assertEquals(db.articles[0].summary, "وصف قصير جداً");
+  await run(feed("وصف قصير جداً", "نص أطول بكثير يوفره الناشر في خلاصته ويضم تفاصيل إضافية مفيدة للقارئ حول الحدث."));
+  assert(String(db.articles[0].summary).startsWith("نص أطول"), "longer excerpt applied");
 });

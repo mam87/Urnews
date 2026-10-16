@@ -32,7 +32,7 @@ export interface Db {
   similar(titles: string[]): Promise<SimilarRow[]>;
   insertArticles(rows: Record<string, unknown>[]): Promise<number>;
   aiTake(n: number): Promise<number>;
-  backfillImages?(rows: { url_hash: string; image_url: string }[]): Promise<number>;
+  backfillImages?(rows: { url_hash: string; image_url: string | null; summary: string | null }[]): Promise<number>;
   finishRun(runId: number, stats: Record<string, unknown>): Promise<void>;
 }
 
@@ -69,6 +69,21 @@ interface Candidate {
 }
 
 const FETCH_TIMEOUT_MS = 15_000;
+/** Longest excerpt we republish. The full article always stays on the publisher's site. */
+export const EXCERPT_MAX = 600;
+
+/** Pick the most useful publisher-provided text, as a limited excerpt (never the full article). */
+export function bestExcerpt(item: FeedItem): string {
+  const clean = (t: string) => (t || "").replace(/\s+/g, " ").trim();
+  let desc = clean(item.description);
+  const content = clean(item.content);
+  if (desc === clean(item.title)) desc = "";
+  let text = content.length > desc.length + 40 ? content : desc;
+  // drop a repeated headline at the start of the text
+  const t = clean(item.title);
+  if (t && text.startsWith(t)) text = text.slice(t.length).replace(/^[\s:\-\u2013\u2014|.]+/, "");
+  return text ? truncate(text, EXCERPT_MAX) : "";
+}
 const MAX_BODY = 5_000_000;
 
 async function timedFetch(f: typeof fetch, url: string, init: RequestInit, ms: number): Promise<Response> {
@@ -183,12 +198,12 @@ async function buildCandidates(deps: Deps, src: SourceRow, items: FeedItem[], st
     const title = truncate(cleanHeadline(item.title), 300);
     if (title.length < 3) continue;
     const url = canonicalUrl(safe);
-    const desc = item.description && item.description !== item.title ? item.description : "";
+    const desc = bestExcerpt(item);
     const lang = detectLanguage(title) === "ar" ? "ar" : (src.language || detectLanguage(title));
     const cls = classify(item.title, desc, item.categories, sourceInfo(src));
     out.push({
       source: src, item, url: safe, hash: await sha256Hex(url), title, titleOriginal: null,
-      summary: src.allow_excerpt && desc ? truncate(desc, 300) : null,
+      summary: src.allow_excerpt && desc ? desc : null,
       summaryKind: src.allow_excerpt && desc ? "feed" : "none",
       language: lang, translated: false, tokens: titleTokens(title), digits: digitsIn(title),
       publishedAt: pub, estimated, cls,
@@ -315,10 +330,10 @@ export async function runIngest(deps: Deps) {
 
     // Exact duplicates (by canonical URL hash)
     const existing = all.length ? await deps.db.existingHashes([...new Set(all.map((c) => c.hash))]) : new Set<string>();
-    // Articles we already have: fill in a thumbnail if the feed now provides one (never overwrite).
+    // Articles we already have: fill in a missing thumbnail / a longer feed excerpt (never overwrite editor work).
     if (deps.db.backfillImages) {
-      const imgs = all.filter((c) => existing.has(c.hash) && c.item.image?.startsWith("https://"))
-        .map((c) => ({ url_hash: c.hash, image_url: c.item.image as string }));
+      const imgs = all.filter((c) => existing.has(c.hash) && (c.item.image?.startsWith("https://") || c.summary))
+        .map((c) => ({ url_hash: c.hash, image_url: c.item.image?.startsWith("https://") ? c.item.image : null, summary: c.summary }));
       if (imgs.length) await deps.db.backfillImages(imgs.slice(0, 200)).catch((e) => log("backfill failed", (e as Error).message));
     }
     const seen = new Set<string>();

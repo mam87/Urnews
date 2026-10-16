@@ -1,7 +1,7 @@
 // Home / category / search page.
 import { sb, h, ARTICLE_COLS, CAT_NAME, configured, loadSources, friendlyError, notConfiguredState, store, ago } from "./common.js";
 import { renderChrome, fetchStatus, ICONS } from "./layout.js";
-import { card, leadBlock, rankScore } from "./cards.js";
+import { card, leadBlock, rankScore, sectionBlock } from "./cards.js";
 import { Live } from "./live.js";
 
 const params = new URLSearchParams(location.search);
@@ -51,6 +51,7 @@ const metaEl = h("span", { class: "meta num" });
 const loadMoreBtn = h("button", { class: "btn", type: "button", onclick: () => loadMore() }, "المزيد من الأخبار");
 const loadMore_ = h("div", { class: "load-more", hidden: true }, loadMoreBtn);
 const leadSlot = h("div");
+const sectionsSlot = h("div");
 const breakingPanel = h("ul", { class: "mini-list" });
 const statusPanel = h("div", { class: "src-status" });
 
@@ -61,6 +62,7 @@ function layout() {
     h("div", { class: "grid" },
       h("div", {},
         q ? null : leadSlot,
+        q || cat ? null : sectionsSlot,
         h("div", { class: "section-head" }, h("h2", {}, title), metaEl,
           q ? null : h("div", { class: "tools" }, sortSeg, pauseBtn)),
         banner, feedEl, loadMore_),
@@ -143,7 +145,36 @@ async function loadLead() {
   const seen = new Set();
   const top = [...data].sort((a, b) => rankScore(b, state.clusterSize.get(b.cluster_id)) - rankScore(a, state.clusterSize.get(a.cluster_id)))
     .filter((a) => { const k = a.cluster_id || "a" + a.id; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, 4);
+  // Prefer a lead story with a picture when it is nearly as important as the top one.
+  const hasImg = (a) => a.image_url && state.sources.get(a.source_id)?.allow_images;
+  const iImg = top.findIndex(hasImg);
+  if (iImg > 0 && rankScore(top[0], state.clusterSize.get(top[0].cluster_id)) - rankScore(top[iImg], state.clusterSize.get(top[iImg].cluster_id)) < 25) {
+    top.unshift(top.splice(iImg, 1)[0]);
+  }
   leadSlot.replaceChildren(leadBlock(top, state.sources, state.clusterSize) || "");
+  state.leadIds = new Set(top.map((a) => a.id));
+  if (!cat) loadSections();
+}
+
+const SECTION_ORDER = ["jordan", "palestine", "arab", "world", "economy", "sports", "tech", "health"];
+async function loadSections() {
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const { data, error } = await sb.from("news_articles").select("id,source_id,title,summary,category,published_at,image_url,importance")
+    .eq("status", "published").is("duplicate_of", null).gt("published_at", since)
+    .order("published_at", { ascending: false }).limit(250);
+  if (error || !data?.length) { sectionsSlot.replaceChildren(); return; }
+  const lead = state.leadIds || new Set();
+  const hasImg = (a) => a.image_url && state.sources.get(a.source_id)?.allow_images;
+  const blocks = [];
+  for (const slug of SECTION_ORDER) {
+    const items = data.filter((a) => a.category === slug && !lead.has(a.id));
+    if (items.length < 2) continue;
+    const withImg = items.slice(0, 4).findIndex(hasImg);
+    if (withImg > 0) items.unshift(items.splice(withImg, 1)[0]);
+    blocks.push(sectionBlock(slug, items, state.sources));
+    if (blocks.length === 6) break;
+  }
+  sectionsSlot.replaceChildren(...(blocks.length ? [h("div", { class: "sections" }, blocks)] : []));
 }
 
 async function loadMore() {

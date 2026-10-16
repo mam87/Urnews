@@ -12,7 +12,7 @@ export function card(a, src, { clusterSize = 1, isNew = false } = {}) {
     h("div", { class: "time num" }, h("b", {}, time(a.published_at)), isToday(a.published_at) ? ago(a.published_at) : shortDate(a.published_at)),
     h("div", {},
       h("div", { class: "meta-row", style: "margin:0" },
-        h("span", { class: "chip cat" }, CAT_NAME[a.category] || ""),
+        h("span", { class: "chip cat", dataset: { cat: a.category } }, CAT_NAME[a.category] || ""),
         a.is_breaking && new Date(a.breaking_until) > new Date() ? h("span", { class: "chip breaking" }, "عاجل") : null,
         verificationChip(a.verification),
         a.translated ? h("span", { class: "chip lang", title: "العنوان مترجم آلياً من " + (a.title_original || "") }, "مترجم") : null,
@@ -32,7 +32,7 @@ export function leadBlock(items, sources, clusterSizes) {
   if (!items.length) return null;
   const [main, ...rest] = items;
   const meta = (a) => h("div", { class: "meta-row" },
-    h("span", { class: "chip cat" }, CAT_NAME[a.category] || ""), verificationChip(a.verification),
+    h("span", { class: "chip cat", dataset: { cat: a.category } }, CAT_NAME[a.category] || ""), verificationChip(a.verification),
     h("span", { class: "src" }, sources.get(a.source_id)?.name_ar || ""), h("span", { class: "num" }, ago(a.published_at)),
     (clusterSizes.get(a.cluster_id) || 1) > 1 ? h("span", { class: "more-src" }, clusterSizes.get(a.cluster_id) === 2 ? "مصدران يغطيان الخبر" : `${clusterSizes.get(a.cluster_id)} مصادر تغطي الخبر`) : null);
   return h("section", { class: "lead", "aria-label": "الأبرز الآن" },
@@ -45,7 +45,25 @@ export function leadBlock(items, sources, clusterSizes) {
       h("h3", {}, h("a", { href: articleLink(main) }, main.title)),
       main.summary ? h("p", {}, main.summary) : null,
       meta(main)),
-    h("div", { class: "lead-side" }, rest.map((a) => h("article", {}, h("h3", {}, h("a", { href: articleLink(a) }, a.title)), meta(a)))));
+    h("div", { class: "lead-side" }, rest.map((a) => h("article", {},
+      h("div", {}, h("h3", {}, h("a", { href: articleLink(a) }, a.title)), meta(a)),
+      a.image_url && sources.get(a.source_id)?.allow_images
+        ? h("img", { class: "thumb", src: a.image_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => e.target.remove() }) : null))));
+}
+
+/** Home-page block: top story with image + a few headlines for one category. */
+export function sectionBlock(slug, items, sources) {
+  if (!items.length) return null;
+  const [top, ...rest] = items;
+  const img = top.image_url && sources.get(top.source_id)?.allow_images;
+  return h("section", { class: "sec", dataset: { cat: slug }, "aria-label": CAT_NAME[slug] },
+    h("div", { class: "sec-head" }, h("h2", {}, CAT_NAME[slug]), h("a", { href: `index.html?cat=${slug}` }, "المزيد ←")),
+    h("div", { class: "sec-top" + (img ? "" : " noimg") },
+      h("div", {}, h("h3", {}, h("a", { href: articleLink(top) }, top.title)),
+        top.summary ? h("p", {}, top.summary) : null,
+        h("div", { class: "meta-row" }, h("span", { class: "src" }, sources.get(top.source_id)?.name_ar || ""), h("span", { class: "num" }, ago(top.published_at)))),
+      img ? h("img", { src: top.image_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => { e.target.parentElement.classList.add("noimg"); e.target.remove(); } }) : null),
+    h("ul", {}, rest.slice(0, 3).map((a) => h("li", {}, h("span", { class: "t num" }, time(a.published_at)), h("a", { href: articleLink(a) }, a.title)))));
 }
 const a_breaking = (a) => a.is_breaking && new Date(a.breaking_until) > new Date();
 

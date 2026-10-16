@@ -35,7 +35,7 @@ function supabaseDb(sb: SupabaseClient): Db {
     similar: (titles) => rpc<SimilarRow[]>("news_similar_articles", { p_titles: titles, p_hours: 36 }),
     insertArticles: async (rows) => (await rpc<unknown[]>("news_insert_articles", { p_rows: rows })).length,
     aiTake: (n) => rpc<number>("news_ai_take", { p_n: n }),
-    backfillImages: (rows) => rpc<number>("news_backfill_images", { p_rows: rows }),
+    backfillImages: (rows) => rpc<number>("news_backfill_articles", { p_rows: rows }),
     finishRun: (id, stats) => rpc<void>("news_finish_ingest_run", { p_run: id, p: stats }),
   };
 }

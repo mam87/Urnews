@@ -132,21 +132,42 @@ for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["desktop", {
   check((await page.locator("li.card", { hasText: "خبر أثناء الإيقاف" }).count()) === 1, `${name}: resume flushes queued items`);
   articles = articles.filter((a) => a.id < 50);
 
+  // reader settings: font size persists across pages
+  await page.locator("#settings-btn").click();
+  await page.locator("dialog.settings button", { hasText: "كبير جداً" }).click();
+  check(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--fs").trim()) === "1.25", `${name}: font size setting applies`);
+  await page.locator("dialog.settings .switch", { hasText: "إخفاء الصور" }).locator("input").check();
+  await page.locator("dialog.settings button", { hasText: "تم" }).click();
+  await page.reload();
+  await page.waitForSelector("li.card");
+  check(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--fs").trim()) === "1.25", `${name}: font size persists after reload`);
+  check(await page.evaluate(() => document.documentElement.dataset.noimg === "1"), `${name}: hide-images persists`);
+  await page.locator("#settings-btn").click();
+  await page.locator("dialog.settings button", { hasText: "ضخم" }).click();
+  await page.locator("dialog.settings button", { hasText: "تم" }).click();
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1 && document.body.scrollWidth <= innerWidth + 1), `${name}: no horizontal overflow at largest font`);
+  check(await page.evaluate(() => { const b = document.querySelector(".brand").getBoundingClientRect(); return b.right <= innerWidth + 1 && b.left >= -1; }), `${name}: masthead fits at largest font`);
+  await page.screenshot({ path: `${outDir}/home-${name}-large-font.png` });
+  await page.evaluate(() => localStorage.removeItem("nabd-prefs"));
+  await page.reload();
+  await page.waitForSelector("li.card");
+
   // dark mode
-  await page.locator("#theme-toggle").click();
+  await page.evaluate(() => document.getElementById("theme-toggle").click());
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   check(bg === "rgb(14, 15, 18)", `${name}: dark mode applies (${bg})`);
   await page.screenshot({ path: `${outDir}/home-${name}-dark.png` });
-  await page.locator("#theme-toggle").click();
+  await page.evaluate(() => document.getElementById("theme-toggle").click());
 
   // article page
   await page.goto(base + "/article.html?id=1");
   await page.waitForSelector("h1");
   check((await page.locator("h1").textContent()).includes("زلزال"), `${name}: article headline`);
-  const href = await page.locator("a.btn-primary").getAttribute("href");
+  const href = await page.locator("a.btn-primary").first().getAttribute("href");
   check(href === "https://a.example/1", `${name}: prominent link to original article`);
   check((await page.locator(".byline").textContent()).includes("بتوقيت عمّان"), `${name}: Amman time shown`);
-  check(await page.locator(".related li").count() === 1, `${name}: related coverage listed`);
+  check(await page.locator(".coverage .item").count() === 1, `${name}: other sources' coverage listed with excerpt`);
+  check(await page.locator(".facts").count() === 1, `${name}: source facts box`);
   check((await page.locator(".summary-label").textContent()).includes("مقتطف"), `${name}: summary provenance labelled`);
   await page.screenshot({ path: `${outDir}/article-${name}.png`, fullPage: true });
   await page.goto(base + "/article.html?id=999");
