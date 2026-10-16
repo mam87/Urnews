@@ -5,7 +5,7 @@
   functions and permissions are untouched (verified: anon can still read LabGram tables).
 * **Edge Functions:** `news-ingest`, `news-notify` (JWT verification off; protected by the Vault token).
   The deployed entrypoint imports `lib/*.ts` from this repository pinned to commit
-  `30d530a43b1368e7a75b504d4ed135bd665cefbe`, so the running code is exactly the tested code.
+  `f41b9eeb96c37de3c616ddbdf848b66eac774d69`, so the running code is exactly the tested code.
   To deploy a new version: push, then redeploy with the new commit SHA in the import URLs
   (or run `scripts/build-functions.sh` and deploy the single-file bundle with the Supabase CLI).
 * **Scheduler:** pg_cron `news-ingest` every 2 min, `news-watchdog` every 5 min.
@@ -19,3 +19,11 @@
 | Working (10) | Disabled and why |
 |---|---|
 | BBC Arabic, Al Jazeera, France 24, DW, Euronews, Sky News Arabia, Asharq Al-Awsat, Anadolu, Roya, AIT News | robots.txt forbids: CNN Arabic, Petra, UN News · HTTP 403 anti-bot (not bypassed): Al Arabiya, Al Ghad, Arab48, Independent Arabia · wrong URL (404/HTML): Al Mamlaka, WAFA, Ammon |
+
+## Images & live TV (2026-10-17)
+* Thumbnails: shown for sources with `allow_images = true` (toggle per source in admin → المصادر).
+  Feeds that include item images: BBC Arabic, Sky News Arabia, France 24, Asharq Al-Awsat, AIT News.
+  Al Jazeera, DW, Euronews, Anadolu and Roya publish no per-item image in their RSS (only a channel logo).
+* Live TV (`live.html`): channels in `news_live_channels`, editable in admin → البث المباشر.
+  Verified YouTube channel IDs (embedded): Al Mamlaka, Al Jazeera Mubasher, Sky News Arabia, Al Araby, DW Arabic.
+  Handle only (opens YouTube live page): Roya, Al Jazeera, Al Arabiya, France 24 Arabic — add their UC… IDs to embed.
