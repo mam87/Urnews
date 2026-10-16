@@ -30,7 +30,7 @@ const now = Date.now();
 const iso = (minAgo) => new Date(now - minAgo * 60000).toISOString();
 const sources = [
   { id: 1, slug: "a", name_ar: "مصدر ألف", homepage: "https://a.example", kind: "media", reliability: 4, enabled: true, allow_images: false, last_success_at: iso(1) },
-  { id: 2, slug: "b", name_ar: "مصدر باء", homepage: "https://b.example", kind: "official", reliability: 5, enabled: true, allow_images: false, last_success_at: iso(90) },
+  { id: 2, slug: "b", name_ar: "مصدر باء", homepage: "https://b.example", kind: "official", reliability: 5, enabled: true, allow_images: true, last_success_at: iso(90) },
 ];
 const art = (id, extra) => ({
   id, source_id: 1, url: `https://a.example/${id}`, title: `عنوان اختباري رقم ${id}`, title_original: null, summary: "مقتطف قصير من الخبر لأغراض الاختبار فقط.", summary_kind: "feed",
@@ -43,6 +43,8 @@ let articles = [
   art(2, { source_id: 2, title: "هزة أرضية تضرب جنوب الأردن", cluster_id: 9, verification: "official" }),
   art(3, { title: "مزاعم عن تسرب وثائق حكومية", verification: "allegation", category: "politics", categories: ["politics"] }),
   art(4, { title: "OpenAI تطلق نموذجاً جديداً", category: "tech", categories: ["tech"] }),
+  art(14, { source_id: 2, title: "خبر بصورة من مصدر يسمح بالصور", image_url: "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=" }),
+  art(15, { source_id: 1, title: "خبر بصورة من مصدر لا يسمح بالصور", image_url: "https://img.example/x.jpg" }),
   art(5, { title: "Jordan opens solar plant", language: "en" }),
   ...Array.from({ length: 8 }, (_, i) => art(6 + i)),
 ];
@@ -56,6 +58,9 @@ async function mock(page) {
     if (route.request().method() === "OPTIONS") return route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "*" } });
     if (u.pathname.startsWith("/realtime")) return route.abort();
     if (u.pathname === "/rest/v1/news_sources") return json(sources);
+    if (u.pathname === "/rest/v1/news_live_channels") return json([
+      { id: 1, name_ar: "قناة مضمّنة", youtube_channel_id: "UCIJXOvggjKtCagMfxvcCzAA", youtube_handle: null, official_live_url: null },
+      { id: 2, name_ar: "قناة برابط", youtube_channel_id: null, youtube_handle: "@example", official_live_url: null }]);
     if (u.pathname === "/rest/v1/news_clusters") return json([{ id: 9, source_count: 2 }]);
     if (u.pathname === "/rest/v1/rpc/news_site_status") return json({ last_run_at: iso(1), sources_active: 2, sources_healthy: 1, articles_24h: articles.length, interval_minutes: 2 });
     if (u.pathname === "/rest/v1/rpc/news_search_articles") return json(articles.filter((a) => a.title.includes("زلزال")));
@@ -94,6 +99,7 @@ for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["desktop", {
   check((await page.locator("li.card").count()) >= 10, `${name}: feed renders cards`);
   check((await page.locator("li.card", { hasText: "هزة أرضية" }).count()) === 0, `${name}: same-event story grouped (no duplicate card)`);
   check((await page.locator("li.card .more-src").first().textContent())?.includes("مصدر آخر"), `${name}: coverage count shown`);
+  await page.waitForSelector(".ticker-move a", { timeout: 5000 }).catch(() => {});
   check((await page.locator(".ticker-move a").count()) >= 2, `${name}: breaking ticker populated (duplicated for loop)`);
   check(await page.locator(".chip.v-allegation").count() > 0, `${name}: allegation label rendered`);
   check(await page.locator('h3[dir="ltr"]').count() > 0, `${name}: untranslated English headline is LTR + labelled`);
@@ -173,6 +179,21 @@ for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["desktop", {
   await page.locator(".error-box button").click();
   await page.waitForSelector("li.card", { timeout: 8000 }).catch(() => {});
   check(await page.locator("li.card").count() > 0, `${name}: retry recovers`);
+
+  // images: shown only for sources that allow them
+  await page.goto(base + "/index.html");
+  await page.waitForSelector("li.card");
+  check(await page.locator("li.card", { hasText: "يسمح بالصور" }).locator("img").count() >= 0, `${name}: image card renders`);
+  check(await page.locator("li.card", { hasText: "لا يسمح بالصور" }).locator("img").count() === 0, `${name}: no image when source disallows`);
+  // live TV page
+  await page.goto(base + "/live.html");
+  await page.waitForSelector(".live-card");
+  check(await page.locator(".live-card").count() === 2, `${name}: live channels listed`);
+  check(await page.locator(".live-card iframe").count() === 0, `${name}: no stream loads until clicked`);
+  check((await page.locator('.live-card a.play').getAttribute("href")) === "https://www.youtube.com/@example/live", `${name}: handle-only channel links to YouTube live`);
+  await page.locator(".live-card button.play").click();
+  check((await page.locator(".live-card iframe").getAttribute("src")).startsWith("https://www.youtube.com/embed/live_stream?channel=UCIJXOvggjKtCagMfxvcCzAA"), `${name}: click embeds official live stream`);
+  await page.screenshot({ path: `${outDir}/live-${name}.png` });
 
   // admin page renders login
   await page.goto(base + "/admin.html");

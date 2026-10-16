@@ -49,6 +49,7 @@ export function renderChrome({ active = "home" } = {}) {
     h("div", { class: "wrap" },
       h("a", { href: "index.html", "aria-current": active === "home" && !cat && !q ? "page" : null }, "الرئيسية"),
       h("a", { href: "breaking.html", class: "breaking-link", "aria-current": active === "breaking" ? "page" : null }, "عاجل"),
+      h("a", { href: "live.html", class: "live-link", "aria-current": active === "live" ? "page" : null }, "بث مباشر"),
       CATEGORIES.map(([slug, name]) => h("a", { href: `index.html?cat=${slug}`, "aria-current": cat === slug ? "page" : null }, name))));
 
   const footer = h("footer", { class: "site" },

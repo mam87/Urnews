@@ -178,7 +178,7 @@ Deno.test("pipeline: overlapping run is skipped; DB failure is recorded and run 
   assertEquals(db.finished.at(-1)?.status, "error");
 });
 
-Deno.test("pipeline: future-dated items are clamped and images respect source permission", async () => {
+Deno.test("pipeline: future-dated items are clamped; https thumbnails are stored (display gated per source)", async () => {
   const db = new FakeDb();
   db.sources = [src(1, "alpha", { allow_images: false }), src(2, "beta", { allow_images: true })];
   const withImg = (host: string) => `<rss xmlns:media="http://search.yahoo.com/mrss/"><channel><item><title>خبر بصورة من ${host}</title><link>https://${host}.example/p</link><pubDate>Sun, 18 Oct 2026 09:00:00 GMT</pubDate><media:content url="https://img.example/${host}.jpg" medium="image"/></item></channel></rss>`;
@@ -186,7 +186,7 @@ Deno.test("pipeline: future-dated items are clamped and images respect source pe
   await runIngest({ fetch: f, db, ai: noAI, now: () => NOW, sleep });
   const a = db.articles.find((x) => x.source_id === 1)!;
   const b = db.articles.find((x) => x.source_id === 2)!;
-  assertEquals(a.image_url, null);
+  assertEquals(a.image_url, "https://img.example/alpha.jpg");
   assertEquals(b.image_url, "https://img.example/beta.jpg");
   assertEquals(a.published_at, NOW.toISOString());
   assertEquals(a.published_estimated, true);

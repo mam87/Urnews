@@ -22,7 +22,9 @@ export function card(a, src, { clusterSize = 1, isNew = false } = {}) {
       h("div", { class: "meta-row" },
         h("span", { class: "src" }, src?.name_ar || "مصدر"),
         clusterSize > 1 ? h("span", { class: "more-src" }, `+ ${clusterSize - 1} ${clusterSize - 1 === 1 ? "مصدر آخر" : clusterSize - 1 === 2 ? "مصدران آخران" : "مصادر أخرى"}`) : null)),
-    allowImg ? h("img", { class: "img", src: a.image_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }) : null);
+    allowImg ? h("img", { class: "img", src: a.image_url, alt: "", loading: "lazy", decoding: "async", referrerpolicy: "no-referrer",
+      title: "الصورة: " + (src?.name_ar || "المصدر"),
+      onerror: (e) => { li.classList.remove("has-img"); e.target.remove(); } }) : null);
   return li;
 }
 
@@ -35,6 +37,10 @@ export function leadBlock(items, sources, clusterSizes) {
     (clusterSizes.get(a.cluster_id) || 1) > 1 ? h("span", { class: "more-src" }, clusterSizes.get(a.cluster_id) === 2 ? "مصدران يغطيان الخبر" : `${clusterSizes.get(a.cluster_id)} مصادر تغطي الخبر`) : null);
   return h("section", { class: "lead", "aria-label": "الأبرز الآن" },
     h("article", { class: "lead-main" },
+      main.image_url && sources.get(main.source_id)?.allow_images
+        ? h("a", { href: articleLink(main), class: "lead-img", tabindex: "-1", "aria-hidden": "true" },
+            h("img", { src: main.image_url, alt: "", referrerpolicy: "no-referrer", decoding: "async", onerror: (e) => e.target.parentElement?.remove() }))
+        : null,
       a_breaking(main) ? h("span", { class: "chip breaking" }, "عاجل") : null,
       h("h3", {}, h("a", { href: articleLink(main) }, main.title)),
       main.summary ? h("p", {}, main.summary) : null,

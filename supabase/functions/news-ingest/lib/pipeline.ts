@@ -363,7 +363,7 @@ export async function runIngest(deps: Deps) {
         translated: c.translated,
         category: c.cls.category,
         categories: c.cls.categories,
-        image_url: c.source.allow_images && c.item.image?.startsWith("https://") ? c.item.image : null,
+        image_url: c.item.image?.startsWith("https://") ? c.item.image : null, // display is gated per source (allow_images)
         published_at: c.publishedAt.toISOString(),
         published_estimated: c.estimated,
         title_tokens: c.tokens,

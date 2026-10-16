@@ -52,7 +52,7 @@ async function render() {
       h("span", {}, "المصدر: ", h("b", {}, src?.name_ar || "غير معروف")),
       h("span", { class: "num" }, "نُشر: ", h("time", { datetime: a.published_at }, full(a.published_at)), a.published_estimated ? " (تقريبي — لم يحدد المصدر وقتاً)" : ""),
       h("span", { class: "num" }, "جُلب: ", ago(a.fetched_at))),
-    src?.allow_images && a.image_url ? h("figure", { class: "article-figure" }, h("img", { src: a.image_url, alt: "", referrerpolicy: "no-referrer" }), h("figcaption", {}, "الصورة: " + (src?.name_ar || "المصدر"))) : null,
+    src?.allow_images && a.image_url ? h("figure", { class: "article-figure" }, h("img", { src: a.image_url, alt: "", referrerpolicy: "no-referrer", onerror: (e) => e.target.closest("figure")?.remove() }), h("figcaption", {}, "الصورة: " + (src?.name_ar || "المصدر"))) : null,
     a.summary ? [
       h("p", { class: "summary-box", dir: foreign ? "ltr" : null }, a.summary),
       h("div", { class: "summary-label" }, "ℹ︎ ", SUMMARY_KIND[a.summary_kind] || SUMMARY_KIND.feed, a.edited ? " · عُدّل تحريرياً" : ""),

@@ -9,7 +9,7 @@ let me = null; let role = null; let current = "overview";
 const STATUS_AR = { published: "منشور", pending: "قيد المراجعة", hidden: "مخفي", rejected: "مرفوض" };
 
 function shell(content) {
-  const tabs = [["overview", "نظرة عامة"], ["articles", "الأخبار"], ["sources", "المصادر"], ["logs", "السجلات والأخطاء"], ["settings", "الإعدادات"], ["editors", "المحررون"]];
+  const tabs = [["overview", "نظرة عامة"], ["articles", "الأخبار"], ["sources", "المصادر"], ["logs", "السجلات والأخطاء"], ["live", "البث المباشر"], ["settings", "الإعدادات"], ["editors", "المحررون"]];
   root.replaceChildren(
     h("div", { class: "section-head" }, h("h2", {}, "لوحة التحرير"), h("span", { class: "meta" }, me?.email || ""),
       h("div", { class: "tools" }, h("a", { class: "btn", href: "index.html" }, "الموقع"), h("button", { class: "btn", type: "button", onclick: async () => { await sb.auth.signOut(); location.reload(); } }, "خروج"))),
@@ -21,7 +21,7 @@ const body = () => document.getElementById("admin-body");
 async function go(tab) {
   current = tab;
   shell(h("ul", { class: "skeleton" }, h("li"), h("li"), h("li")));
-  try { await ({ overview, articles, sources, logs, settings, editors })[tab](); }
+  try { await ({ overview, articles, sources, logs, live, settings, editors })[tab](); }
   catch (e) { console.error(e); body().replaceChildren(h("div", { class: "error-box" }, friendlyError(e), h("div", { class: "note" }, String(e?.message || "")))); }
 }
 const must = ({ data, error }) => { if (error) throw error; return data; };
@@ -134,9 +134,10 @@ async function sources() {
     h("div", { class: "toolbar" }, h("button", { class: "btn btn-primary", type: "button", onclick: addSourceDialog }, "إضافة مصدر"),
       h("span", { class: "note" }, "الفترة بالدقائق؛ لا يمكن أن تقل عن الحد الأدنى المسجل لشروط المصدر.")),
     h("div", { class: "table-wrap" }, h("table", {},
-      h("thead", {}, h("tr", {}, ["المصدر", "الحالة", "آخر نجاح", "24 ساعة", "تشغيل", "الفترة", "الموثوقية", ""].map((x) => h("th", {}, x)))),
+      h("thead", {}, h("tr", {}, ["المصدر", "الحالة", "آخر نجاح", "24 ساعة", "تشغيل", "صور", "الفترة", "الموثوقية", ""].map((x) => h("th", {}, x)))),
       h("tbody", {}, rows.map((s) => {
         const enabled = h("input", { type: "checkbox", checked: s.enabled, "aria-label": "مفعل" });
+        const imgs = h("input", { type: "checkbox", checked: s.allow_images, "aria-label": "عرض الصور", title: "عرض الصور المصغّرة التي يوفرها المصدر في خلاصته" });
         const interval = h("input", { type: "number", min: s.min_interval_minutes, max: "1440", value: s.poll_interval_minutes, style: "width:70px" });
         const rel = h("select", {}, [1, 2, 3, 4, 5].map((n) => h("option", { value: n, selected: s.reliability === n }, "★".repeat(n))));
         const ok = s.consecutive_failures === 0 && s.last_status !== "blocked";
@@ -147,9 +148,9 @@ async function sources() {
             s.next_fetch_at ? h("span", { class: "sub" }, "التالي: " + time(s.next_fetch_at)) : null),
           h("td", { class: "num" }, s.last_success_at ? ago(s.last_success_at) : "—"),
           h("td", { class: "num" }, `${s.fetches_24h} جلب · ${s.errors_24h} خطأ · ${s.new_24h} جديد`, h("span", { class: "sub" }, `7 أيام: ${s.published_7d} خبراً، ${s.rejected_7d} مرفوض/مخفي`)),
-          h("td", {}, enabled), h("td", {}, interval), h("td", {}, rel),
+          h("td", {}, enabled), h("td", {}, imgs), h("td", {}, interval), h("td", {}, rel),
           h("td", {}, h("div", { class: "row-actions" },
-            h("button", { class: "btn btn-primary", type: "button", onclick: () => save(s.id, { enabled: enabled.checked, poll_interval_minutes: Number(interval.value), reliability: Number(rel.value) }) }, "حفظ"),
+            h("button", { class: "btn btn-primary", type: "button", onclick: () => save(s.id, { enabled: enabled.checked, allow_images: imgs.checked, poll_interval_minutes: Number(interval.value), reliability: Number(rel.value) }) }, "حفظ"),
             h("button", { class: "btn", type: "button", onclick: () => save(s.id, { next_fetch_at: new Date().toISOString() }) }, "جلب الآن"))));
       })))));
 }
@@ -201,6 +202,37 @@ async function logs() {
         h("td", { class: "num" }, `${r.sources_ok}/${r.sources_attempted}`), h("td", { class: "num" }, `${r.items_new}/${r.items_seen}`),
         h("td", { class: "num" }, r.ai_calls), h("td", { class: "num" }, r.duration_ms ? `${(r.duration_ms / 1000).toFixed(1)}s` : "—"),
         h("td", {}, r.error ? h("span", { class: "sub" }, r.error.slice(0, 200)) : "")))))));
+}
+
+/* ---------------- live channels ---------------- */
+async function live() {
+  const rows = must(await sb.from("news_live_channels").select("*").order("sort_order"));
+  const idOk = (v) => !v || /^UC[A-Za-z0-9_-]{22}$/.test(v);
+  const handleOk = (v) => !v || /^@[A-Za-z0-9._-]{3,40}$/.test(v);
+  const save = async (id, patch) => {
+    if (!idOk(patch.youtube_channel_id)) return toast("معرّف القناة يبدأ بـ UC ويتكون من 24 حرفاً");
+    if (!handleOk(patch.youtube_handle)) return toast("اسم القناة على يوتيوب يبدأ بـ @");
+    try {
+      if (id) must(await sb.from("news_live_channels").update(patch).eq("id", id));
+      else must(await sb.from("news_live_channels").insert(patch));
+      toast("حُفظ"); go("live");
+    } catch (e) { toast(/check/.test(e.message) ? "أدخل معرّف القناة أو اسمها على يوتيوب" : friendlyError(e)); }
+  };
+  const row = (c) => {
+    const name = h("input", { value: c.name_ar || "", maxlength: "60", style: "width:140px" });
+    const cid = h("input", { value: c.youtube_channel_id || "", dir: "ltr", placeholder: "UC…", style: "width:220px" });
+    const handle = h("input", { value: c.youtube_handle || "", dir: "ltr", placeholder: "@handle", style: "width:130px" });
+    const order = h("input", { type: "number", value: c.sort_order ?? 100, style: "width:64px" });
+    const en = h("input", { type: "checkbox", checked: c.enabled ?? true });
+    const patch = () => ({ name_ar: name.value.trim(), youtube_channel_id: cid.value.trim() || null, youtube_handle: handle.value.trim() || null, sort_order: Number(order.value), enabled: en.checked });
+    return h("tr", {}, h("td", {}, name), h("td", {}, cid), h("td", {}, handle), h("td", {}, order), h("td", {}, en),
+      h("td", {}, h("button", { class: "btn btn-primary", type: "button", onclick: () => save(c.id, patch()) }, c.id ? "حفظ" : "إضافة")));
+  };
+  body().replaceChildren(
+    h("p", { class: "note" }, "مع «معرّف القناة» (UC…) يُعرض البث داخل الموقع. بدونه يُفتح البث على يوتيوب عبر اسم القناة (@…). تجد المعرّف في يوتيوب: صفحة القناة ← حول ← مشاركة القناة ← نسخ معرّف القناة."),
+    h("div", { class: "table-wrap" }, h("table", {},
+      h("thead", {}, h("tr", {}, ["القناة", "معرّف القناة (UC…)", "اسمها على يوتيوب", "الترتيب", "مفعّل", ""].map((x) => h("th", {}, x)))),
+      h("tbody", {}, rows.map(row), row({})))));
 }
 
 /* ---------------- settings ---------------- */
