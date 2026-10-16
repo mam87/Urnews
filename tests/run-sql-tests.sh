@@ -10,7 +10,14 @@ $P -c "create database $DB" >/dev/null
 trap '$P -c "drop database if exists $DB" >/dev/null' EXIT
 $P -d $DB -f tests/sql/00_supabase_stubs.sql >/dev/null
 for f in supabase/migrations/*.sql; do
-  case "$f" in *scheduler*) continue;; esac
+  case "$f" in *scheduler*|*sources*) continue;; esac
   $P -d $DB -f "$f" >/dev/null
 done
 $P -At -d $DB -f tests/sql/10_db_tests.sql 2>&1 >/dev/null | sed -E "s/^psql:[^ ]+ (NOTICE|WARNING):  /  /" | grep -v "already exists"
+
+# Seed data must also apply cleanly (validates feed URL / interval constraints).
+$P -c "create database ${DB}_seed" >/dev/null
+$P -d ${DB}_seed -f tests/sql/00_supabase_stubs.sql >/dev/null 2>&1
+for f in supabase/migrations/*.sql; do case "$f" in *scheduler*) continue;; esac; $P -d ${DB}_seed -f "$f" >/dev/null 2>&1; done
+echo "  ok - seed sources apply: $($P -At -d ${DB}_seed -c "select count(*) || ' sources (' || count(*) filter (where enabled) || ' enabled)' from public.sources")"
+$P -c "drop database ${DB}_seed" >/dev/null

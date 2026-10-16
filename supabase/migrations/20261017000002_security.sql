@@ -35,6 +35,7 @@ grant select on public.categories to anon, authenticated;
 create policy categories_read on public.categories for select using (true);
 
 grant select (key, value, is_public, updated_at) on public.settings to anon, authenticated;
+grant select (description) on public.settings to authenticated;
 create policy settings_public_read on public.settings for select using (is_public or public.is_admin());
 
 grant select (id, slug, name_ar, name_en, homepage, language, country, kind, reliability, default_category,
