@@ -18,7 +18,7 @@
 ## First real run — source status
 | Working (10) | Disabled and why |
 |---|---|
-| BBC Arabic, Al Jazeera, France 24, DW, Euronews, Sky News Arabia, Asharq Al-Awsat, Anadolu, Roya, AIT News | robots.txt forbids: CNN Arabic, Petra, UN News · HTTP 403 anti-bot (not bypassed): Al Arabiya, Al Ghad, Arab48, Independent Arabia · wrong URL (404/HTML): Al Mamlaka, WAFA, Ammon |
+| BBC Arabic, Al Jazeera, France 24, DW, Euronews, Sky News Arabia, Asharq Al-Awsat, Anadolu, Roya, AIT News, JO24, Hala News, Al-Quds Al-Arabi (added 2026-10-17) | robots.txt forbids: CNN Arabic, Petra, UN News · HTTP 403 anti-bot (not bypassed): Al Arabiya, Al Ghad, Arab48, Independent Arabia · wrong URL (404/HTML): Al Mamlaka, WAFA, Ammon · also probed and not added: Al Araby/Al-Araby Al-Jadeed, Al Mayadeen, Maan, Elaph, Addustour (403 or robots disallow), Arabi21 (feed times mislabelled), Khaberni/Saraya (no RSS) |
 
 ## Images & live TV (2026-10-17)
 * Thumbnails: shown for sources with `allow_images = true` (toggle per source in admin → المصادر).
