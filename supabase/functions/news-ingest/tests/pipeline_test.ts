@@ -256,3 +256,19 @@ Deno.test("pipeline: existing article gets a longer excerpt later", async () => 
   await run(feed("وصف قصير جداً", "نص أطول بكثير يوفره الناشر في خلاصته ويضم تفاصيل إضافية مفيدة للقارئ حول الحدث."));
   assert(String(db.articles[0].summary).startsWith("نص أطول"), "longer excerpt applied");
 });
+
+Deno.test("pipeline: fresh high-impact Jordan event is breaking; old one or allegation is not", async () => {
+  const db = new FakeDb();
+  db.sources = [src(1, "alpha", { default_category: "jordan" })];
+  const iso = (m: number) => new Date(NOW.getTime() - m * 60000).toUTCString();
+  const { f } = mockFetch({ "https://alpha.example/rss": () => new Response(rss([
+    { t: "حريق في مصنع بمدينة الزرقاء الأردنية", l: "https://alpha.example/a", date: iso(10) },
+    { t: "حريق في مستودع بإربد الأردنية قبل ساعات", l: "https://alpha.example/b", date: iso(120) },
+    { t: "أنباء عن انفجار في العقبة الأردنية", l: "https://alpha.example/c", date: iso(5) },
+  ])) });
+  await runIngest({ fetch: f, db, ai: noAI, now: () => NOW, sleep });
+  const by = (u: string) => db.articles.find((a) => String(a.url).endsWith(u))!;
+  assertEquals(by("/a").is_breaking, true);
+  assertEquals(by("/b").is_breaking, false);
+  assertEquals(by("/c").is_breaking, false);
+});

@@ -11,7 +11,7 @@ export const USER_AGENT = "NabdNewsBot/1.0 (+https://github.com/; RSS reader; re
 export interface SourceRow {
   id: number; slug: string; name_ar: string; feed_url: string; homepage: string; language: string;
   kind: SourceInfo["kind"]; reliability: number; default_category: Category | null; topical: boolean;
-  tz_offset_minutes: number; poll_interval_minutes: number; max_items: number; allow_images: boolean;
+  tz_offset_minutes: number; tz_force_minutes?: number | null; poll_interval_minutes: number; max_items: number; allow_images: boolean;
   allow_excerpt: boolean; consecutive_failures: number; etag: string | null; last_modified: string | null;
   robots_checked_at: string | null; robots_allowed: boolean | null;
 }
@@ -299,7 +299,7 @@ export async function runIngest(deps: Deps) {
           rec.attempts = r.attempts;
           if (r.kind === "ok") {
             try {
-              const items = parseFeed(r.body, src.feed_url, src.tz_offset_minutes);
+              const items = parseFeed(r.body, src.feed_url, src.tz_offset_minutes, src.tz_force_minutes ?? null);
               cands = await buildCandidates(deps, src, items, st, now);
               Object.assign(rec, { status: "ok", items_found: items.length, etag: r.etag ?? null, last_modified: r.lastModified ?? null });
             } catch (e) {
@@ -371,7 +371,11 @@ export async function runIngest(deps: Deps) {
     const breakingMs = st.breaking_hours * 3600_000;
     const rows = fresh.map((c) => {
       const recentEnough = now.getTime() - c.publishedAt.getTime() < 3 * 3600_000;
-      const breaking = c.cls.isBreakingKeyword && recentEnough && !c.dupOf;
+      const ageMin = (now.getTime() - c.publishedAt.getTime()) / 60_000;
+      // Breaking = the publisher says so ("عاجل"), or a fresh high-impact local (Jordan) event.
+      // Corroborated multi-source events are promoted later in SQL. Allegations are never auto-breaking.
+      const localUrgent = c.cls.highImpact && c.cls.categories.includes("jordan") && ageMin < 60 && c.cls.verification !== "allegation";
+      const breaking = (c.cls.isBreakingKeyword && recentEnough || localUrgent) && !c.dupOf && !c.estimated;
       return {
         source_id: c.source.id,
         guid: (c.item.guid || c.url).slice(0, 1000),

@@ -57,7 +57,7 @@ const MONTHS: Record<string, number> = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4,
  * Parse a feed date. Dates without an explicit zone are interpreted using
  * `assumeOffsetMinutes` (e.g. +180 for Jordan), because many Arabic CMSs omit it.
  */
-export function parseDate(raw: unknown, assumeOffsetMinutes = 0): Date | null {
+export function parseDate(raw: unknown, assumeOffsetMinutes = 0, forceOffsetMinutes: number | null = null): Date | null {
   const s = text(raw).trim();
   if (!s) return null;
   // ISO 8601
@@ -65,7 +65,7 @@ export function parseDate(raw: unknown, assumeOffsetMinutes = 0): Date | null {
   if (m) {
     const [, y, mo, d, h = "0", mi = "0", se = "0", tz] = m;
     let ms = Date.UTC(+y, +mo - 1, +d, +h, +mi, +se);
-    ms -= tzOffsetMinutes(tz, assumeOffsetMinutes) * 60_000;
+    ms -= (forceOffsetMinutes ?? tzOffsetMinutes(tz, assumeOffsetMinutes)) * 60_000;
     return valid(ms);
   }
   // RFC 822 / 1123: "Sat, 17 Oct 2026 10:00:00 +0300" (weekday optional, seconds optional)
@@ -76,7 +76,7 @@ export function parseDate(raw: unknown, assumeOffsetMinutes = 0): Date | null {
     if (mon === undefined) return null;
     let y = +yRaw; if (y < 100) y += 2000;
     let ms = Date.UTC(y, mon, +d, +h, +mi, +se);
-    ms -= tzOffsetMinutes(tz, assumeOffsetMinutes) * 60_000;
+    ms -= (forceOffsetMinutes ?? tzOffsetMinutes(tz, assumeOffsetMinutes)) * 60_000;
     return valid(ms);
   }
   const t = Date.parse(s);
@@ -126,10 +126,14 @@ function pickImage(node: Record<string, unknown>, html: string, base: string): s
   return html ? firstImgFromHtml(html, base) : null;
 }
 
-export function parseFeed(body: string, feedUrl: string, assumeOffsetMinutes = 0): FeedItem[] {
+/**
+ * @param assumeOffsetMinutes zone for timestamps that carry none
+ * @param forceOffsetMinutes  for feeds that label their times with a WRONG zone: ignore the label and use this
+ */
+export function parseFeed(body: string, feedUrl: string, assumeOffsetMinutes = 0, forceOffsetMinutes: number | null = null): FeedItem[] {
   if (body.length > MAX_BYTES) throw new FeedParseError("feed too large");
   const trimmed = body.replace(/^﻿/, "").trimStart();
-  if (trimmed.startsWith("{")) return parseJsonFeed(trimmed, feedUrl, assumeOffsetMinutes);
+  if (trimmed.startsWith("{")) return parseJsonFeed(trimmed, feedUrl, assumeOffsetMinutes, forceOffsetMinutes);
   if (!trimmed.startsWith("<")) throw new FeedParseError("not XML or JSON");
   if (/<!ENTITY/i.test(trimmed.slice(0, 4000))) throw new FeedParseError("DTD entities not allowed");
   let doc: Record<string, unknown>;
@@ -151,7 +155,7 @@ export function parseFeed(body: string, feedUrl: string, assumeOffsetMinutes = 0
         title: stripHtml(text(n["title"])),
         description: stripHtml(text(n["description"]) || html),
         content: stripHtml(text(n["content:encoded"])),
-        publishedAt: parseDate(n["pubDate"] ?? n["dc:date"] ?? n["published"] ?? n["updated"], assumeOffsetMinutes),
+        publishedAt: parseDate(n["pubDate"] ?? n["dc:date"] ?? n["published"] ?? n["updated"], assumeOffsetMinutes, forceOffsetMinutes),
         image: pickImage(n, html, feedUrl),
         categories: arr(n["category"]).map((c) => stripHtml(text(c))).filter(Boolean),
       };
@@ -168,7 +172,7 @@ export function parseFeed(body: string, feedUrl: string, assumeOffsetMinutes = 0
         title: stripHtml(text(n["title"])),
         description: stripHtml(text(n["summary"]) || html),
         content: stripHtml(text(n["content"])),
-        publishedAt: parseDate(n["published"] ?? n["updated"], assumeOffsetMinutes),
+        publishedAt: parseDate(n["published"] ?? n["updated"], assumeOffsetMinutes, forceOffsetMinutes),
         image: pickImage(n, html, feedUrl),
         categories: arr(n["category"] as Record<string, unknown>[]).map((c) => stripHtml(String(c?.["@_term"] ?? text(c)))).filter(Boolean),
       };
@@ -179,7 +183,7 @@ export function parseFeed(body: string, feedUrl: string, assumeOffsetMinutes = 0
   return items.filter((i) => i.url && i.title);
 }
 
-function parseJsonFeed(body: string, feedUrl: string, off: number): FeedItem[] {
+function parseJsonFeed(body: string, feedUrl: string, off: number, force: number | null): FeedItem[] {
   let doc: Record<string, unknown>;
   try { doc = JSON.parse(body); } catch { throw new FeedParseError("invalid JSON"); }
   if (!Array.isArray(doc.items)) throw new FeedParseError("JSON feed has no items");
@@ -191,7 +195,7 @@ function parseJsonFeed(body: string, feedUrl: string, off: number): FeedItem[] {
       title: stripHtml(n.title),
       description: stripHtml(n.summary ?? n.content_text ?? n.content_html ?? ""),
       content: stripHtml(n.content_text ?? n.content_html ?? ""),
-      publishedAt: parseDate(n.date_published ?? n.date_modified, off),
+      publishedAt: parseDate(n.date_published ?? n.date_modified, off, force),
       image: safeUrl(n.image ?? n.banner_image, feedUrl),
       categories: Array.isArray(n.tags) ? (n.tags as unknown[]).map((t) => stripHtml(t)) : [],
     };

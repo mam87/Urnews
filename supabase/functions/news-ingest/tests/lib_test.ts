@@ -228,3 +228,9 @@ Deno.test("AI disabled by default; output validation blocks invented numbers/quo
   assertEquals(validateAIOutput(input, { title: "زلزال يضرب الأردن", summary: "قال الوزير: \"لا إصابات\"" }), null);
   assertEquals(validateAIOutput(input, "not json"), null);
 });
+
+Deno.test("parseDate: forced offset fixes feeds that mislabel UTC as +03:00", () => {
+  assertEquals(parseDate("Sat, 17 Oct 2026 06:07:56 +0300", 180, 0)?.toISOString(), "2026-10-17T06:07:56.000Z");
+  assertEquals(parseDate("Sat, 17 Oct 2026 06:07:56 +0300", 180, null)?.toISOString(), "2026-10-17T03:07:56.000Z");
+  assertEquals(parseFeed(`<rss><channel><item><title>خبر</title><link>https://x.example/1</link><pubDate>Sat, 17 Oct 2026 06:07:56 +0300</pubDate></item></channel></rss>`, "https://x.example/", 180, 0)[0].publishedAt?.toISOString(), "2026-10-17T06:07:56.000Z");
+});
