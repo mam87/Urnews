@@ -5,7 +5,7 @@ import { Live } from "./live.js";
 
 const chrome = renderChrome({ active: "breaking" });
 const root = document.getElementById("app");
-document.title = "عاجل — نبض الأخبار";
+document.title = "عاجل — لحظة";
 const list = h("ol", { class: "timeline" });
 let sources = new Map();
 let lastIds = "";

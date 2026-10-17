@@ -199,11 +199,11 @@ Deno.test("jaccard edge cases", () => {
 // ---------------- robots / backoff ----------------
 Deno.test("robots.txt evaluation", () => {
   const txt = "User-agent: *\nDisallow: /private\nAllow: /private/rss\n\nUser-agent: BadBot\nDisallow: /";
-  assert(robotsAllows(txt, "NabdNewsBot/1.0", "/rss.xml"));
-  assertFalse(robotsAllows(txt, "NabdNewsBot/1.0", "/private/x"));
-  assert(robotsAllows(txt, "NabdNewsBot/1.0", "/private/rss"));
-  assertFalse(robotsAllows("User-agent: nabdnewsbot\nDisallow: /", "NabdNewsBot/1.0", "/feed"));
-  assert(robotsAllows("User-agent: *\nDisallow:", "NabdNewsBot/1.0", "/feed"));
+  assert(robotsAllows(txt, "LahzaNewsBot/1.0", "/rss.xml"));
+  assertFalse(robotsAllows(txt, "LahzaNewsBot/1.0", "/private/x"));
+  assert(robotsAllows(txt, "LahzaNewsBot/1.0", "/private/rss"));
+  assertFalse(robotsAllows("User-agent: lahzanewsbot\nDisallow: /", "LahzaNewsBot/1.0", "/feed"));
+  assert(robotsAllows("User-agent: *\nDisallow:", "LahzaNewsBot/1.0", "/feed"));
   assertFalse(robotsAllows("User-agent: *\nDisallow: /*.xml$", "x", "/feed.xml"));
 });
 

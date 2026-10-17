@@ -38,7 +38,7 @@ async function loadClusterSizes(rows) {
 }
 
 const title = cat ? CAT_NAME[cat] : q ? `نتائج البحث: ${q}` : "آخر الأخبار";
-document.title = `${cat ? CAT_NAME[cat] + " — " : q ? "بحث — " : ""}نبض الأخبار`;
+document.title = `${cat ? CAT_NAME[cat] + " — " : q ? "بحث — " : ""}لحظة`;
 
 const feedEl = h("ul", { class: "feed", id: "feed", "aria-live": "off" });
 const bannerBtn = h("button", { type: "button", onclick: () => flushQueue(true) });

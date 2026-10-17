@@ -4,7 +4,7 @@ import { renderChrome, fetchStatus, ICONS } from "./layout.js";
 
 const chrome = renderChrome({ active: "live" });
 const root = document.getElementById("app");
-document.title = "البث المباشر — نبض الأخبار";
+document.title = "البث المباشر — لحظة";
 
 const embedUrl = (id) => `https://www.youtube.com/embed/live_stream?channel=${encodeURIComponent(id)}&autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1`;
 const youtubeLive = (c) => c.youtube_handle ? `https://www.youtube.com/${c.youtube_handle}/live`

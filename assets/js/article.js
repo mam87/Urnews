@@ -18,7 +18,7 @@ async function render() {
   if (!a) return notFound();
   const sources = await loadSources();
   const src = sources.get(a.source_id);
-  document.title = `${a.title} — نبض الأخبار`;
+  document.title = `${a.title} — لحظة`;
   document.querySelector('meta[name="description"]')?.setAttribute("content", a.summary || a.title);
 
   let related = [];

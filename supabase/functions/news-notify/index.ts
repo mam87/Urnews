@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
   if (!alert) return new Response("not found", { status: 404 });
   if (alert.notified_at) return new Response(JSON.stringify({ skipped: "already notified" }));
 
-  const text = `⚠️ نبض الأخبار — تنبيه\n${alert.message}\n(${alert.kind})`;
+  const text = `⚠️ لحظة — تنبيه\n${alert.message}\n(${alert.kind})`;
   const sent: string[] = [];
   const errors: string[] = [];
 
@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${env("RESEND_API_KEY")}` },
       body: JSON.stringify({
-        from: env("ALERT_EMAIL_FROM") || "Nabd Alerts <onboarding@resend.dev>",
+        from: env("ALERT_EMAIL_FROM") || "Lahza Alerts <onboarding@resend.dev>",
         to: [env("ALERT_EMAIL_TO")],
         subject: "تنبيه: " + alert.message.slice(0, 80),
         text,

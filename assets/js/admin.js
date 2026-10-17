@@ -3,7 +3,7 @@
 import { sb, h, configured, notConfiguredState, CATEGORIES, CAT_NAME, VERIFICATION, ago, full, time, toast, friendlyError, initTheme } from "./common.js";
 
 const root = document.getElementById("app");
-document.title = "لوحة التحرير — نبض الأخبار";
+document.title = "لوحة التحرير — لحظة";
 initTheme();
 let me = null; let role = null; let current = "overview";
 const STATUS_AR = { published: "منشور", pending: "قيد المراجعة", hidden: "مخفي", rejected: "مرفوض" };

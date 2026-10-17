@@ -1,4 +1,4 @@
-# Nabd News — Setup, Operations & Recovery
+# Lahza News — Setup, Operations & Recovery
 
 This guide takes the platform from an empty Supabase project to a running site, and covers day-to-day maintenance.
 

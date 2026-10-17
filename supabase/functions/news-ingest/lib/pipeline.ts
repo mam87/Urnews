@@ -6,7 +6,7 @@ import { Category, classify, cleanHeadline, SourceInfo } from "./classify.ts";
 import { backoffMinutes, isTransientStatus, retryAfterSeconds, robotsAllows } from "./robots.ts";
 import { AIConfig, aiProcess, digitsIn } from "./ai.ts";
 
-export const USER_AGENT = "NabdNewsBot/1.0 (+https://github.com/; RSS reader; respects robots.txt)";
+export const USER_AGENT = "LahzaNewsBot/1.0 (+https://github.com/; RSS reader; respects robots.txt)";
 
 export interface SourceRow {
   id: number; slug: string; name_ar: string; feed_url: string; homepage: string; language: string;

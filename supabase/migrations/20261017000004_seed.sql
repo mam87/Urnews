@@ -26,5 +26,5 @@ insert into public.news_settings (key, value, description, is_public) values
   ('ai_daily_limit',             '300',   'أقصى عدد استدعاءات ذكاء اصطناعي يومياً (حد إنفاق)', false),
   ('ai_summarize',               'false', 'تلخيص الأخبار العربية بالذكاء الاصطناعي (الترجمة تعمل دائماً إن توفر مفتاح)', false),
   ('owner_email',                '""',    'بريد المالك: أول دخول بهذا البريد يحصل على دور المالك (مرة واحدة)', false),
-  ('site_name',                  '"نبض الأخبار"', 'اسم الموقع', true)
+  ('site_name',                  '"لحظة"', 'اسم الموقع', true)
 on conflict (key) do nothing;
