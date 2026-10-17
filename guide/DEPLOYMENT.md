@@ -1,8 +1,12 @@
 # Current deployment (2026-10-17)
 
-* **Database / backend:** Supabase project **LabGram** (`ualumobbhukgmjbznhea`, ap-southeast-2), shared with the
-  LabGram app. Every news object is prefixed `news_` and all grants are scoped to those objects; LabGram tables,
-  functions and permissions are untouched (verified: anon can still read LabGram tables).
+* **Database / backend:** Supabase project **CV Pro** (`ghxnmnydeuvnrsulywbj`, eu-central-1), shared with the
+  CV Pro app. Moved here on 2026-10-17 because the free plan allows only 2 active projects and LabGram
+  (`ualumobbhukgmjbznhea`, the previous host) was paused. Every news object is prefixed `news_` and all grants
+  are scoped to those objects; CV Pro tables, functions and permissions are untouched (verified: grant
+  fingerprints identical before/after, anon can still read CV Pro `packages`). Articles stored in LabGram were
+  not copied; LabGram still holds its own `news_` copy and can be dropped or resumed later.
+  Migrations were applied by fetching the files from this repo at commit `93797ee` (md5 verified) and executing them.
 * **Edge Functions:** `news-ingest`, `news-notify` (JWT verification off; protected by the Vault token).
   The deployed entrypoint imports `lib/*.ts` from this repository pinned to commit
   `eb1ee46c71f2ac22e0307a85b2facdc0aa62ac34`, so the running code is exactly the tested code.
