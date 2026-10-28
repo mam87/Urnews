@@ -253,6 +253,7 @@ Deno.test("aiConfigFromEnv infers the provider from the key alone", () => {
   assertEquals(cfg({}).provider, "none");
   const g = cfg({ AI_API_KEY: "AIzaTEST" });
   assertEquals([g.provider, g.baseUrl, g.model], ["openai", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-flash-lite-latest"]);
+  assertEquals(cfg({ AI_API_KEY: "AQ.Ab8test" }).baseUrl, "https://generativelanguage.googleapis.com/v1beta/openai");
   assertEquals(cfg({ AI_API_KEY: "sk-ant-x" }).provider, "anthropic");
   assertEquals(cfg({ AI_API_KEY: "gsk_x" }).baseUrl, "https://api.groq.com/openai/v1");
   assertEquals(cfg({ AI_API_KEY: "sk-x" }).baseUrl, "https://api.openai.com/v1");

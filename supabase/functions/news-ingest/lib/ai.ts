@@ -11,10 +11,10 @@ export interface AIConfig {
 }
 
 /** Provider is inferred from the key when AI_PROVIDER is not set, so one secret (AI_API_KEY) is enough:
- *  sk-ant-… → Anthropic · AIza… → Google Gemini (OpenAI-compatible) · gsk_… → Groq · other → OpenAI. */
+ *  sk-ant-… → Anthropic · AIza… / AQ.… → Google Gemini (OpenAI-compatible) · gsk_… → Groq · other → OpenAI. */
 export function aiConfigFromEnv(get: (k: string) => string | undefined): AIConfig {
   const apiKey = (get("AI_API_KEY") || "").trim();
-  const guess = apiKey.startsWith("sk-ant-") ? "anthropic" : apiKey.startsWith("AIza") ? "gemini" : apiKey.startsWith("gsk_") ? "groq" : "openai";
+  const guess = apiKey.startsWith("sk-ant-") ? "anthropic" : apiKey.startsWith("AIza") || apiKey.startsWith("AQ.") ? "gemini" : apiKey.startsWith("gsk_") ? "groq" : "openai";
   const declared = (get("AI_PROVIDER") || "").toLowerCase();
   const kind = declared === "anthropic" || declared === "openai" ? declared : guess;
   const p = apiKey ? (kind === "anthropic" ? "anthropic" : "openai") : "none";
