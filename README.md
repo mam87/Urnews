@@ -1,7 +1,7 @@
 # لحظة — Lahza News
 
 An automated Arabic live breaking-news site. A scheduler inside the database collects headlines from
-official RSS feeds every 2 minutes, classifies and de-duplicates them, groups reports of the same event,
+official RSS feeds every minute, classifies and de-duplicates them, groups reports of the same event,
 labels how well-sourced each item is, and pushes updates to open browsers, with no server or PC of yours
 running.
 

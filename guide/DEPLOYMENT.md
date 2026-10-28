@@ -12,7 +12,7 @@
   `eb1ee46c71f2ac22e0307a85b2facdc0aa62ac34`, so the running code is exactly the tested code.
   To deploy a new version: push, then redeploy with the new commit SHA in the import URLs
   (or run `scripts/build-functions.sh` and deploy the single-file bundle with the Supabase CLI).
-* **Scheduler:** pg_cron `news-ingest` every 2 min, `news-watchdog` every 5 min.
+* **Scheduler:** pg_cron `news-ingest` every 1 min (was 2 min until 2026-10-28), `news-watchdog` every 5 min.
 * **Pending (needs a one-time approval in the Claude chat, because they contain DELETE statements):**
   the retention function `news_purge_old()` + its daily job, and the daily `cron.job_run_details` cleanup.
   Until then nothing is deleted automatically; at ~2–5 MB/day this is not urgent.

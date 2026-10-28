@@ -179,7 +179,7 @@ async function checkRobots(deps: Deps, src: SourceRow, now: Date): Promise<boole
   }
 }
 
-export const AI_MAX_PER_RUN = 12;
+export const AI_MAX_PER_RUN = 8; // runs every minute; keeps under ~15 requests/min (Gemini free tier)
 
 export function sourceInfo(s: SourceRow): SourceInfo {
   return { kind: s.kind, reliability: s.reliability, default_category: s.default_category, topical: s.topical };
