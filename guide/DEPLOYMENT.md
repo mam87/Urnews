@@ -31,3 +31,12 @@
 * Live TV (`live.html`): channels in `news_live_channels`, editable in admin → البث المباشر.
   Verified YouTube channel IDs (embedded): Al Mamlaka, Al Jazeera Mubasher, Sky News Arabia, Al Araby, DW Arabic.
   Handle only (opens YouTube live page): Roya, Al Jazeera, Al Arabiya, France 24 Arabic — add their UC… IDs to embed.
+
+## Hebrew sources (2026-10-28)
+* Ynet (newsflashes), Walla (breaking), Maariv (breaking) — enabled, fetched OK on the first run.
+  Haaretz (HTTP 403 anti-bot, not bypassed) and Israel Hayom (`/rss` is not a feed) were added then disabled.
+* Hebrew items are published **only** as Arabic machine translations (headline + short translated excerpt + link).
+  Untranslated items are skipped and retried next run, so these sources stay silent until an AI key is set
+  (`AI_PROVIDER`, `AI_API_KEY`, optional `AI_MODEL`/`AI_BASE_URL` as Edge Function secrets). `ai_daily_limit` = 800.
+* The 60 items stored by the run just before the new code was deployed were set to `hidden` (untranslated).
+* Edge Function `news-ingest` now imports `lib/*.ts` pinned to commit `1a878bf`.
