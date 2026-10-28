@@ -35,8 +35,15 @@ export function aiConfigFromEnv(get: (k: string) => string | undefined): AIConfi
   };
 }
 
-/** Thrown on HTTP 429 so the caller can stop calling the provider for the rest of the run. */
+/** Thrown on HTTP 429/401/403 so the caller stops calling the provider for the rest of the run. */
 export class AIRateLimited extends Error {}
+
+async function httpError(r: Response, cfg: AIConfig): Promise<Error> {
+  const body = (await r.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 300);
+  const where = cfg.provider === "anthropic" ? "anthropic" : new URL(cfg.baseUrl).host;
+  const msg = `AI HTTP ${r.status} from ${where} (model ${cfg.model}): ${body}`;
+  return [401, 403, 429].includes(r.status) ? new AIRateLimited(msg) : new Error(msg);
+}
 
 export interface AIResult { title: string; summary: string }
 
@@ -96,8 +103,7 @@ export async function aiProcess(cfg: AIConfig, title: string, description: strin
         headers: { "content-type": "application/json", "x-api-key": cfg.apiKey, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({ model: cfg.model, max_tokens: 400, temperature: 0, system: SYSTEM, messages: [{ role: "user", content: user }] }),
       });
-      if (r.status === 429) throw new AIRateLimited("AI HTTP 429");
-      if (!r.ok) throw new Error(`AI HTTP ${r.status}`);
+      if (!r.ok) throw await httpError(r, cfg);
       const j = await r.json();
       text = (j.content || []).map((c: { text?: string }) => c.text || "").join("");
     } else {
@@ -107,8 +113,7 @@ export async function aiProcess(cfg: AIConfig, title: string, description: strin
         headers: { "content-type": "application/json", authorization: `Bearer ${cfg.apiKey}` },
         body: JSON.stringify({ model: cfg.model, temperature: 0, max_tokens: 1000, messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }] }),
       });
-      if (r.status === 429) throw new AIRateLimited("AI HTTP 429");
-      if (!r.ok) throw new Error(`AI HTTP ${r.status}`);
+      if (!r.ok) throw await httpError(r, cfg);
       const j = await r.json();
       text = j.choices?.[0]?.message?.content || "";
     }
