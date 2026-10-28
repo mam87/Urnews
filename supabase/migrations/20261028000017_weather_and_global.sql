@@ -19,3 +19,6 @@ where slug in ('aljazeera-en', 'jordan-times');
 
 update public.news_settings set value = '25' where key = 'max_sources_per_run' and value::int < 25;
 update public.news_settings set value = '1200' where key = 'ai_daily_limit' and value::int < 1200;
+
+-- First run: Jordan Times returns HTTP 403 (anti-bot) — disabled, not bypassed. All other sources above OK.
+update public.news_sources set enabled = false, terms_note = 'Disabled 2026-10-28: HTTP 403 anti-bot (not bypassed)' where slug = 'jordan-times';
