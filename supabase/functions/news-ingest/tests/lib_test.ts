@@ -234,3 +234,16 @@ Deno.test("parseDate: forced offset fixes feeds that mislabel UTC as +03:00", ()
   assertEquals(parseDate("Sat, 17 Oct 2026 06:07:56 +0300", 180, null)?.toISOString(), "2026-10-17T03:07:56.000Z");
   assertEquals(parseFeed(`<rss><channel><item><title>خبر</title><link>https://x.example/1</link><pubDate>Sat, 17 Oct 2026 06:07:56 +0300</pubDate></item></channel></rss>`, "https://x.example/", 180, 0)[0].publishedAt?.toISOString(), "2026-10-17T06:07:56.000Z");
 });
+
+// ---------------- Hebrew ----------------
+Deno.test("detectLanguage recognises Hebrew", () => {
+  assertEquals(detectLanguage("ראש הממשלה נפגש עם שר החוץ"), "he");
+  assertEquals(detectLanguage("דיווח: 3 נפגעים ב-Tel Aviv"), "he");
+  assertEquals(detectLanguage("رئيس الوزراء يلتقي وزير الخارجية"), "ar");
+});
+
+Deno.test("validateAIOutput rejects output that still contains Hebrew", () => {
+  const input = "העוצר הוסר בצפון";
+  assertEquals(validateAIOutput(input, { title: "رفع حظر التجول في الشمال", summary: "" })?.title, "رفع حظر التجول في الشمال");
+  assertEquals(validateAIOutput(input, { title: "رفع حظر التجول في הצפון", summary: "" }), null);
+});

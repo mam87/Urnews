@@ -30,6 +30,8 @@ const SYSTEM = `أنت محرر أخبار عربي دقيق. مهمتك فقط:
 - لا تضف أي معلومة غير موجودة في النص: لا أسماء ولا أرقام ولا تواريخ ولا أعداد ضحايا ولا اقتباسات.
 - حافظ على نسبة الأقوال لأصحابها ("قال"، "أفاد"، "بحسب"). لا تحول الادعاءات إلى حقائق.
 - إن كان النص غير واضح فاكتفِ بترجمة حرفية قصيرة.
+- عند الترجمة من مصدر عبري أو أجنبي: انقل الرواية كما وردت ونسبها للمصدر (مثل: "بحسب يديعوت أحرونوت")، ولا تقدّم رواية المصدر كحقيقة مؤكدة.
+- اكتب أسماء الأماكن والأشخاص بصيغتها العربية المتداولة.
 - العنوان أقل من 120 حرفاً، والملخص جملة أو جملتان أقل من 280 حرفاً.
 أعد JSON فقط بالشكل: {"title":"...","summary":"..."}`;
 
@@ -46,6 +48,7 @@ export function validateAIOutput(input: string, out: unknown): AIResult | null {
   const summary = typeof o.summary === "string" ? o.summary.trim() : "";
   if (!title || detectLanguage(title) !== "ar") return null;
   if (summary && detectLanguage(summary) !== "ar") return null;
+  if (/[\u05D0-\u05EA]/.test(title + summary)) return null; // untranslated Hebrew left in the output
   const allowed = digitsIn(input);
   for (const d of digitsIn(title + " " + summary)) if (!allowed.has(d)) return null;
   if (/["“”«»]/.test(summary) && !/["“”«»]/.test(input)) return null; // no invented quotations
@@ -58,10 +61,14 @@ function extractJson(s: string): unknown {
   try { return JSON.parse(m[0]); } catch { return null; }
 }
 
-export async function aiProcess(cfg: AIConfig, title: string, description: string, mode: "translate" | "summarize"): Promise<AIResult | null> {
+const LANG_AR: Record<string, string> = { he: "العبرية", en: "الإنجليزية", fr: "الفرنسية" };
+
+export async function aiProcess(cfg: AIConfig, title: string, description: string, mode: "translate" | "summarize", opts: { lang?: string; sourceName?: string } = {}): Promise<AIResult | null> {
   if (cfg.provider === "none") return null;
   const input = `العنوان: ${title}\nالنص: ${truncate(description, 1500)}`;
-  const task = mode === "translate" ? "ترجم العنوان والنص إلى العربية، واجعل الملخص ترجمة مختصرة للنص." : "اكتب ملخصاً عربياً موجزاً للنص، وأعد العنوان كما هو.";
+  const from = opts.lang && LANG_AR[opts.lang] ? ` من ${LANG_AR[opts.lang]}` : "";
+  const src = opts.sourceName ? ` المصدر: ${opts.sourceName}.` : "";
+  const task = mode === "translate" ? `ترجم العنوان والنص${from} إلى العربية، واجعل الملخص ترجمة مختصرة للنص.${src}` : "اكتب ملخصاً عربياً موجزاً للنص، وأعد العنوان كما هو.";
   const user = `${task}\n\n${input}`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), cfg.timeoutMs);

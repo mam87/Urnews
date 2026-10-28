@@ -161,7 +161,7 @@ function addSourceDialog() {
   const form = h("form", { class: "form-grid" },
     f("name_ar", "الاسم بالعربية", { required: true, maxlength: "80" }), f("slug", "معرّف لاتيني (a-z, 0-9, -)", { required: true, pattern: "[a-z0-9-]{2,40}", dir: "ltr" }),
     f("feed_url", "رابط خلاصة RSS/Atom الرسمية", { required: true, type: "url", dir: "ltr" }), f("homepage", "الموقع (https)", { required: true, type: "url", dir: "ltr" }),
-    sel("language", "اللغة", [["ar", "العربية"], ["en", "الإنجليزية"], ["fr", "الفرنسية"]]),
+    sel("language", "اللغة", [["ar", "العربية"], ["en", "الإنجليزية"], ["fr", "الفرنسية"], ["he", "العبرية"]]),
     sel("kind", "النوع", [["media", "وسيلة إعلام"], ["agency", "وكالة أنباء"], ["official", "جهة رسمية"]]),
     sel("default_category", "القسم الافتراضي", [["", "تلقائي"], ...CATEGORIES]),
     sel("reliability", "الموثوقية", [["3", "3"], ["4", "4"], ["5", "5"], ["2", "2"], ["1", "1"]]),

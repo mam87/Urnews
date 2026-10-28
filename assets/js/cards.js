@@ -16,7 +16,7 @@ export function card(a, src, { clusterSize = 1, isNew = false } = {}) {
         a.is_breaking && new Date(a.breaking_until) > new Date() ? h("span", { class: "chip breaking" }, "عاجل") : null,
         verificationChip(a.verification),
         a.translated ? h("span", { class: "chip lang", title: "العنوان مترجم آلياً من " + (a.title_original || "") }, "مترجم") : null,
-        a.language !== "ar" && !a.translated ? h("span", { class: "chip lang" }, "بالإنجليزية") : null),
+        a.language !== "ar" && !a.translated ? h("span", { class: "chip lang" }, a.language === "fr" ? "بالفرنسية" : "بالإنجليزية") : null),
       h("h3", { dir: a.language !== "ar" && !a.translated ? "ltr" : null }, h("a", { href: articleLink(a) }, a.title)),
       a.summary ? h("p", {}, a.summary) : null,
       h("div", { class: "meta-row" },

@@ -221,6 +221,28 @@ Deno.test("pipeline: AI translation path with validation (mocked provider)", asy
   assertEquals(art.summary_kind, "ai");
 });
 
+Deno.test("pipeline: Hebrew items are translated and reclassified, never published untranslated", async () => {
+  const feed = () => new Response(rss([{ t: "דיווח: פיצוץ בבסיס צבאי בצפון", l: "https://he.example/1", d: "פרטים נוספים בהמשך" }]));
+  // 1) no AI key -> nothing stored (retried next run)
+  const db = new FakeDb();
+  db.sources = [src(1, "he", { language: "he" })];
+  await runIngest({ fetch: mockFetch({ "https://he.example/rss": feed }).f, db, ai: noAI, now: () => NOW, sleep });
+  assertEquals(db.articles.length, 0);
+  // 2) with AI -> Arabic title, Hebrew kept only as title_original, no Hebrew excerpt
+  const ai = aiConfigFromEnv((k) => ({ AI_PROVIDER: "anthropic", AI_API_KEY: "test" } as Record<string, string>)[k]);
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response(JSON.stringify({ content: [{ text: '{"title":"بحسب تقارير: انفجار في قاعدة عسكرية شمالاً","summary":""}' }] }))) as typeof fetch;
+  try {
+    await runIngest({ fetch: mockFetch({ "https://he.example/rss": feed }).f, db, ai, now: () => NOW, sleep });
+  } finally { globalThis.fetch = origFetch; }
+  assertEquals(db.articles.length, 1);
+  const art = db.articles[0];
+  assertEquals(art.title, "بحسب تقارير: انفجار في قاعدة عسكرية شمالاً");
+  assertEquals(art.title_original, "דיווח: פיצוץ בבסיס צבאי בצפון");
+  assertEquals(art.language, "ar");
+  assertEquals(art.summary, null);
+});
+
 Deno.test("pipeline: existing articles get a thumbnail later, never overwritten", async () => {
   const db = new FakeDb();
   db.sources = [src(1, "alpha")];

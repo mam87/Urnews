@@ -101,10 +101,12 @@ export function jaccard(a: string[], b: string[]): { score: number; shared: numb
 }
 
 /** Detect dominant script/language of a short text. */
-export function detectLanguage(s: string): "ar" | "en" | "fr" | "other" {
+export function detectLanguage(s: string): "ar" | "he" | "en" | "fr" | "other" {
   const ar = (s.match(/[؀-ۿ]/g) || []).length;
+  const he = (s.match(/[\u05D0-\u05EA]/g) || []).length;
   const lat = (s.match(/[A-Za-zÀ-ÿ]/g) || []).length;
-  if (ar >= lat && ar > 0) return "ar";
+  if (ar >= lat && ar >= he && ar > 0) return "ar";
+  if (he >= lat && he > 0) return "he";
   if (lat === 0) return "other";
   if (/[éèêàçùûôî]|\b(le|la|les|des|du|une|est)\b/i.test(s)) return "fr";
   return "en";

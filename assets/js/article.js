@@ -53,7 +53,7 @@ async function render() {
       verificationChip(a.verification),
       a.translated ? h("span", { class: "chip lang" }, "مترجم آلياً") : null),
     h("h1", { dir: foreign ? "ltr" : null }, a.title),
-    a.translated && a.title_original ? h("p", { class: "note", dir: "ltr", lang: "en" }, "العنوان الأصلي: " + a.title_original) : null,
+    a.translated && a.title_original ? h("p", { class: "note" }, "العنوان الأصلي: ", h("span", { dir: "auto" }, a.title_original)) : null,
     h("div", { class: "byline" },
       h("span", {}, "المصدر: ", h("b", {}, srcName)),
       h("span", { class: "num" }, "نُشر: ", h("time", { datetime: a.published_at }, full(a.published_at)), a.published_estimated ? " (تقريبي — لم يحدد المصدر وقتاً)" : ""),

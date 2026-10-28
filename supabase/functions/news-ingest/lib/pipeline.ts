@@ -353,14 +353,23 @@ export async function runIngest(deps: Deps) {
         try {
           stats.ai_calls++;
           const mode = c.language !== "ar" ? "translate" : "summarize";
-          const res = await aiProcess(deps.ai, c.item.title, c.item.description || "", mode);
+          const res = await aiProcess(deps.ai, c.item.title, c.item.description || "", mode, { lang: c.language, sourceName: c.source.name_ar });
           if (res) {
-            if (mode === "translate") { c.titleOriginal = c.title; c.title = res.title; c.translated = true; c.tokens = titleTokens(res.title); }
+            if (mode === "translate") {
+              c.titleOriginal = c.title; c.title = res.title; c.translated = true; c.tokens = titleTokens(res.title); c.digits = digitsIn(res.title);
+              // Keyword rules are Arabic, so classify again on the translation (category, breaking, attribution).
+              c.cls = classify(res.title, res.summary || "", c.item.categories, sourceInfo(c.source));
+              c.summary = null; c.summaryKind = "none"; // never keep the foreign-language excerpt
+            }
             if (res.summary && c.source.allow_excerpt) { c.summary = res.summary; c.summaryKind = "ai"; }
           }
         } catch (e) { log("ai error", (e as Error).message); }
       }
     }
+
+    // Hebrew is never shown untranslated: items without a translation (no AI key, daily cap reached or
+    // rejected output) are skipped now and retried on the next run while still in the feed.
+    fresh = fresh.filter((c) => c.language !== "he" || c.translated);
 
     // Near-duplicates and event clustering
     if (fresh.length) {
