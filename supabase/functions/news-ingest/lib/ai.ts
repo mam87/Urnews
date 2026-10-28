@@ -10,18 +10,33 @@ export interface AIConfig {
   timeoutMs: number;
 }
 
+/** Provider is inferred from the key when AI_PROVIDER is not set, so one secret (AI_API_KEY) is enough:
+ *  sk-ant-… → Anthropic · AIza… → Google Gemini (OpenAI-compatible) · gsk_… → Groq · other → OpenAI. */
 export function aiConfigFromEnv(get: (k: string) => string | undefined): AIConfig {
-  const provider = (get("AI_PROVIDER") || "none").toLowerCase();
-  const apiKey = get("AI_API_KEY") || "";
-  const p = (provider === "anthropic" || provider === "openai") && apiKey ? provider : "none";
+  const apiKey = (get("AI_API_KEY") || "").trim();
+  const guess = apiKey.startsWith("sk-ant-") ? "anthropic" : apiKey.startsWith("AIza") ? "gemini" : apiKey.startsWith("gsk_") ? "groq" : "openai";
+  const declared = (get("AI_PROVIDER") || "").toLowerCase();
+  const kind = declared === "anthropic" || declared === "openai" ? declared : guess;
+  const p = apiKey ? (kind === "anthropic" ? "anthropic" : "openai") : "none";
+  const defaults: Record<string, [string, string]> = {
+    anthropic: ["claude-haiku-5-5", ""],
+    gemini: ["gemini-flash-lite-latest", "https://generativelanguage.googleapis.com/v1beta/openai"],
+    groq: ["llama-3.3-70b-versatile", "https://api.groq.com/openai/v1"],
+    openai: ["gpt-4o-mini", "https://api.openai.com/v1"],
+  };
+  const profile = kind === "anthropic" ? "anthropic" : guess === "anthropic" ? "openai" : guess;
+  const [model, base] = defaults[profile];
   return {
     provider: p as AIConfig["provider"],
     apiKey,
-    model: get("AI_MODEL") || (p === "anthropic" ? "claude-haiku-5-5" : "gpt-4o-mini"),
-    baseUrl: (get("AI_BASE_URL") || "https://api.openai.com/v1").replace(/\/+$/, ""),
+    model: get("AI_MODEL") || model,
+    baseUrl: (get("AI_BASE_URL") || base || "https://api.openai.com/v1").replace(/\/+$/, ""),
     timeoutMs: 20_000,
   };
 }
+
+/** Thrown on HTTP 429 so the caller can stop calling the provider for the rest of the run. */
+export class AIRateLimited extends Error {}
 
 export interface AIResult { title: string; summary: string }
 
@@ -81,6 +96,7 @@ export async function aiProcess(cfg: AIConfig, title: string, description: strin
         headers: { "content-type": "application/json", "x-api-key": cfg.apiKey, "anthropic-version": "2023-06-01" },
         body: JSON.stringify({ model: cfg.model, max_tokens: 400, temperature: 0, system: SYSTEM, messages: [{ role: "user", content: user }] }),
       });
+      if (r.status === 429) throw new AIRateLimited("AI HTTP 429");
       if (!r.ok) throw new Error(`AI HTTP ${r.status}`);
       const j = await r.json();
       text = (j.content || []).map((c: { text?: string }) => c.text || "").join("");
@@ -89,8 +105,9 @@ export async function aiProcess(cfg: AIConfig, title: string, description: strin
         method: "POST",
         signal: ctrl.signal,
         headers: { "content-type": "application/json", authorization: `Bearer ${cfg.apiKey}` },
-        body: JSON.stringify({ model: cfg.model, temperature: 0, max_tokens: 400, messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }] }),
+        body: JSON.stringify({ model: cfg.model, temperature: 0, max_tokens: 1000, messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }] }),
       });
+      if (r.status === 429) throw new AIRateLimited("AI HTTP 429");
       if (!r.ok) throw new Error(`AI HTTP ${r.status}`);
       const j = await r.json();
       text = j.choices?.[0]?.message?.content || "";

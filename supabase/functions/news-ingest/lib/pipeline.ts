@@ -4,7 +4,7 @@ import { canonicalUrl, safeUrl, sha256Hex } from "./url.ts";
 import { detectLanguage, jaccard, titleTokens, truncate } from "./text.ts";
 import { Category, classify, cleanHeadline, SourceInfo } from "./classify.ts";
 import { backoffMinutes, isTransientStatus, retryAfterSeconds, robotsAllows } from "./robots.ts";
-import { AIConfig, aiProcess, digitsIn } from "./ai.ts";
+import { AIConfig, aiProcess, AIRateLimited, digitsIn } from "./ai.ts";
 
 export const USER_AGENT = "LahzaNewsBot/1.0 (+https://github.com/; RSS reader; respects robots.txt)";
 
@@ -179,6 +179,8 @@ async function checkRobots(deps: Deps, src: SourceRow, now: Date): Promise<boole
   }
 }
 
+export const AI_MAX_PER_RUN = 12;
+
 export function sourceInfo(s: SourceRow): SourceInfo {
   return { kind: s.kind, reliability: s.reliability, default_category: s.default_category, topical: s.topical };
 }
@@ -347,7 +349,10 @@ export async function runIngest(deps: Deps) {
     if (deps.ai.provider !== "none" && fresh.length) {
       const needTranslate = fresh.filter((c) => c.language !== "ar");
       const needSummary = st.ai_summarize ? fresh.filter((c) => c.language === "ar" && (c.item.description?.length ?? 0) > 400 && c.source.allow_excerpt) : [];
-      const wanted = [...needTranslate, ...needSummary.slice(0, 10)];
+      // Newest first and capped per run, so free-tier rate limits (≈15 requests/min) are respected;
+      // anything left over is translated on the next run (every 2 minutes).
+      needTranslate.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+      const wanted = [...needTranslate, ...needSummary.slice(0, 10)].slice(0, AI_MAX_PER_RUN);
       const granted = wanted.length ? await deps.db.aiTake(wanted.length) : 0;
       for (const c of wanted.slice(0, granted)) {
         try {
@@ -363,7 +368,10 @@ export async function runIngest(deps: Deps) {
             }
             if (res.summary && c.source.allow_excerpt) { c.summary = res.summary; c.summaryKind = "ai"; }
           }
-        } catch (e) { log("ai error", (e as Error).message); }
+        } catch (e) {
+          log("ai error", (e as Error).message);
+          if (e instanceof AIRateLimited) break; // provider says slow down: stop for this run
+        }
       }
     }
 

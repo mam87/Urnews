@@ -247,3 +247,14 @@ Deno.test("validateAIOutput rejects output that still contains Hebrew", () => {
   assertEquals(validateAIOutput(input, { title: "رفع حظر التجول في الشمال", summary: "" })?.title, "رفع حظر التجول في الشمال");
   assertEquals(validateAIOutput(input, { title: "رفع حظر التجول في הצפון", summary: "" }), null);
 });
+
+Deno.test("aiConfigFromEnv infers the provider from the key alone", () => {
+  const cfg = (env: Record<string, string>) => aiConfigFromEnv((k) => env[k]);
+  assertEquals(cfg({}).provider, "none");
+  const g = cfg({ AI_API_KEY: "AIzaTEST" });
+  assertEquals([g.provider, g.baseUrl, g.model], ["openai", "https://generativelanguage.googleapis.com/v1beta/openai", "gemini-flash-lite-latest"]);
+  assertEquals(cfg({ AI_API_KEY: "sk-ant-x" }).provider, "anthropic");
+  assertEquals(cfg({ AI_API_KEY: "gsk_x" }).baseUrl, "https://api.groq.com/openai/v1");
+  assertEquals(cfg({ AI_API_KEY: "sk-x" }).baseUrl, "https://api.openai.com/v1");
+  assertEquals(cfg({ AI_API_KEY: "AIzaTEST", AI_MODEL: "m", AI_BASE_URL: "https://x/v1/" }).baseUrl, "https://x/v1");
+});
