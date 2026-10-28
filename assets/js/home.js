@@ -3,6 +3,7 @@ import { sb, h, ARTICLE_COLS, CAT_NAME, configured, loadSources, friendlyError, 
 import { renderChrome, fetchStatus, ICONS } from "./layout.js";
 import { card, leadBlock, rankScore, sectionBlock } from "./cards.js";
 import { Live } from "./live.js";
+import { weatherPanel } from "./weather.js";
 
 const params = new URLSearchParams(location.search);
 const cat = CAT_NAME[params.get("cat")] ? params.get("cat") : null;
@@ -69,8 +70,9 @@ function layout() {
       h("aside", {},
         h("section", { class: "panel" }, h("h2", {}, h("span", { class: "chip breaking" }, "عاجل"), "الآن"), breakingPanel,
           h("a", { href: "breaking.html", class: "note" }, "كل الأخبار العاجلة ←")),
+        q ? null : weatherPanel(),
         h("section", { class: "panel" }, h("h2", {}, "حالة المصادر"), statusPanel,
-          h("p", { class: "note" }, "يجلب الخادم الأخبار تلقائياً كل دقيقتين تقريباً، ولكل مصدر فترة جلب تحترم شروطه. ", h("a", { href: "sources.html" }, "المنهجية"))))));
+          h("p", { class: "note" }, "يجلب الخادم الأخبار تلقائياً كل دقيقة، ولكل مصدر فترة جلب تحترم شروطه. ", h("a", { href: "sources.html" }, "المنهجية"))))));
 }
 
 function renderRows(rows, { prepend = false, isNew = false } = {}) {
@@ -156,7 +158,7 @@ async function loadLead() {
   if (!cat) loadSections();
 }
 
-const SECTION_ORDER = ["jordan", "palestine", "arab", "world", "economy", "sports", "tech", "health"];
+const SECTION_ORDER = ["jordan", "palestine", "arab", "world", "economy", "weather", "sports", "tech", "health"];
 async function loadSections() {
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
   const { data, error } = await sb.from("news_articles").select("id,source_id,title,summary,category,published_at,image_url,importance")

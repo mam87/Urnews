@@ -308,16 +308,16 @@ dialog::backdrop { background: rgba(0,0,0,.45); }
    ===================================================================== */
 :root {
   --c-jordan: #b7791f; --c-palestine: #2f7d4f; --c-arab: #9c4221; --c-world: #2b6cb0; --c-politics: #6b46c1;
-  --c-economy: #0f766e; --c-tech: #3b5bdb; --c-health: #c2410c; --c-sports: #15803d;
+  --c-economy: #0f766e; --c-tech: #3b5bdb; --c-health: #c2410c; --c-sports: #15803d; --c-weather: #0284c7;
   --radius-lg: 14px;
   --ring: color-mix(in srgb, var(--accent) 45%, transparent);
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --c-jordan: #f2a93b; --c-palestine: #5cc98a; --c-arab: #f08a5d; --c-world: #6aa8ff; --c-politics: #b794f4;
-  --c-economy: #4fd1c5; --c-tech: #8ea2ff; --c-health: #fb923c; --c-sports: #4ade80; } }
+  --c-economy: #4fd1c5; --c-tech: #8ea2ff; --c-health: #fb923c; --c-sports: #4ade80; --c-weather: #38bdf8; } }
 :root[data-theme="dark"] {
   --c-jordan: #f2a93b; --c-palestine: #5cc98a; --c-arab: #f08a5d; --c-world: #6aa8ff; --c-politics: #b794f4;
-  --c-economy: #4fd1c5; --c-tech: #8ea2ff; --c-health: #fb923c; --c-sports: #4ade80; }
+  --c-economy: #4fd1c5; --c-tech: #8ea2ff; --c-health: #fb923c; --c-sports: #4ade80; --c-weather: #38bdf8; }
 
 ::selection { background: var(--accent-soft); color: var(--ink); }
 body { background:
@@ -351,7 +351,7 @@ body { background:
 [data-cat="jordan"] { --cat: var(--c-jordan); } [data-cat="palestine"] { --cat: var(--c-palestine); }
 [data-cat="arab"] { --cat: var(--c-arab); } [data-cat="world"] { --cat: var(--c-world); }
 [data-cat="politics"] { --cat: var(--c-politics); } [data-cat="economy"] { --cat: var(--c-economy); }
-[data-cat="tech"] { --cat: var(--c-tech); } [data-cat="health"] { --cat: var(--c-health); } [data-cat="sports"] { --cat: var(--c-sports); }
+[data-cat="tech"] { --cat: var(--c-tech); } [data-cat="health"] { --cat: var(--c-health); } [data-cat="sports"] { --cat: var(--c-sports); } [data-cat="weather"] { --cat: var(--c-weather); }
 .chip.cat { color: var(--cat, var(--accent-ink)); }
 .chip.cat::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 
@@ -498,3 +498,13 @@ html, body { overflow-x: clip; }
   .topstrip .push a { display: none; }
 }
 .card h3, .lead-main h3, .lead-side h3, .sec h3, .article h1 { overflow-wrap: anywhere; }
+
+/* Jordan weather panel */
+.wx-now { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.wx-icon { font-size: 2.4rem; line-height: 1; }
+.wx-temp { font-family: var(--f-head); font-size: 1.75rem; line-height: 1.1; }
+.wx-days, .wx-cities { list-style: none; margin: 0; padding: 0; }
+.wx-days li { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center; padding: 6px 0; border-top: 1px solid var(--rule); font-size: 0.875rem; }
+.wx-rain { color: var(--c-weather); font-size: 0.75rem; }
+.wx-cities { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--rule); }
+.wx-cities li { display: flex; gap: 6px; align-items: center; justify-content: space-between; font-size: 0.875rem; }

@@ -259,3 +259,9 @@ Deno.test("aiConfigFromEnv infers the provider from the key alone", () => {
   assertEquals(cfg({ AI_API_KEY: "sk-x" }).baseUrl, "https://api.openai.com/v1");
   assertEquals(cfg({ AI_API_KEY: "AIzaTEST", AI_MODEL: "m", AI_BASE_URL: "https://x/v1/" }).baseUrl, "https://x/v1");
 });
+
+Deno.test("classify puts weather news in the weather section", () => {
+  const c = classify("الأرصاد: منخفض جوي وأمطار غزيرة على المملكة غداً", "تتأثر المملكة بكتلة هوائية باردة", [], media);
+  assertEquals(c.category, "weather");
+  assertEquals(classify("ارتفاع أسعار النفط في الأسواق العالمية", "", [], media).category, "economy");
+});

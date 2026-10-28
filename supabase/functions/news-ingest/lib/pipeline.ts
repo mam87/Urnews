@@ -375,9 +375,9 @@ export async function runIngest(deps: Deps) {
       }
     }
 
-    // Hebrew is never shown untranslated: items without a translation (no AI key, daily cap reached or
-    // rejected output) are skipped now and retried on the next run while still in the feed.
-    fresh = fresh.filter((c) => c.language !== "he" || c.translated);
+    // Foreign-language items are shown only in Arabic: items without a translation (no AI key, per-run or
+    // daily cap reached, rejected output) are skipped now and retried on a later run while still in the feed.
+    fresh = fresh.filter((c) => c.language === "ar" || c.translated);
 
     // Near-duplicates and event clustering
     if (fresh.length) {
