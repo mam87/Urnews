@@ -85,40 +85,84 @@ function extractJson(s: string): unknown {
 
 const LANG_AR: Record<string, string> = { he: "العبرية", en: "الإنجليزية", fr: "الفرنسية" };
 
-export async function aiProcess(cfg: AIConfig, title: string, description: string, mode: "translate" | "summarize", opts: { lang?: string; sourceName?: string } = {}): Promise<AIResult | null> {
-  if (cfg.provider === "none") return null;
-  const input = `العنوان: ${title}\nالنص: ${truncate(description, 1500)}`;
-  const from = opts.lang && LANG_AR[opts.lang] ? ` من ${LANG_AR[opts.lang]}` : "";
-  const src = opts.sourceName ? ` المصدر: ${opts.sourceName}.` : "";
-  const task = mode === "translate" ? `ترجم العنوان والنص${from} إلى العربية، واجعل الملخص ترجمة مختصرة للنص.${src}` : "اكتب ملخصاً عربياً موجزاً للنص، وأعد العنوان كما هو.";
-  const user = `${task}\n\n${input}`;
+/** One chat request to the configured provider; returns the raw text. Throws AIRateLimited on 401/403/429. */
+async function callModel(cfg: AIConfig, system: string, user: string, maxTokens: number): Promise<string> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), cfg.timeoutMs);
   try {
-    let text = "";
     if (cfg.provider === "anthropic") {
       const r = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
         signal: ctrl.signal,
         headers: { "content-type": "application/json", "x-api-key": cfg.apiKey, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: cfg.model, max_tokens: 400, temperature: 0, system: SYSTEM, messages: [{ role: "user", content: user }] }),
+        body: JSON.stringify({ model: cfg.model, max_tokens: maxTokens, temperature: 0, system, messages: [{ role: "user", content: user }] }),
       });
       if (!r.ok) throw await httpError(r, cfg);
       const j = await r.json();
-      text = (j.content || []).map((c: { text?: string }) => c.text || "").join("");
-    } else {
-      const r = await fetch(`${cfg.baseUrl}/chat/completions`, {
-        method: "POST",
-        signal: ctrl.signal,
-        headers: { "content-type": "application/json", authorization: `Bearer ${cfg.apiKey}` },
-        body: JSON.stringify({ model: cfg.model, temperature: 0, max_tokens: 1000, messages: [{ role: "system", content: SYSTEM }, { role: "user", content: user }] }),
-      });
-      if (!r.ok) throw await httpError(r, cfg);
-      const j = await r.json();
-      text = j.choices?.[0]?.message?.content || "";
+      return (j.content || []).map((c: { text?: string }) => c.text || "").join("");
     }
-    return validateAIOutput(input, extractJson(text));
+    const r = await fetch(`${cfg.baseUrl}/chat/completions`, {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: { "content-type": "application/json", authorization: `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify({ model: cfg.model, temperature: 0, max_tokens: maxTokens, messages: [{ role: "system", content: system }, { role: "user", content: user }] }),
+    });
+    if (!r.ok) throw await httpError(r, cfg);
+    const j = await r.json();
+    return j.choices?.[0]?.message?.content || "";
   } finally {
     clearTimeout(timer);
   }
+}
+
+function aiInput(title: string, description: string, max = 1500) {
+  return `العنوان: ${title}\nالنص: ${truncate(description, max)}`;
+}
+
+export async function aiProcess(cfg: AIConfig, title: string, description: string, mode: "translate" | "summarize", opts: { lang?: string; sourceName?: string } = {}): Promise<AIResult | null> {
+  if (cfg.provider === "none") return null;
+  const input = aiInput(title, description);
+  const from = opts.lang && LANG_AR[opts.lang] ? ` من ${LANG_AR[opts.lang]}` : "";
+  const src = opts.sourceName ? ` المصدر: ${opts.sourceName}.` : "";
+  const task = mode === "translate" ? `ترجم العنوان والنص${from} إلى العربية، واجعل الملخص ترجمة مختصرة للنص.${src}` : "اكتب ملخصاً عربياً موجزاً للنص، وأعد العنوان كما هو.";
+  const text = await callModel(cfg, SYSTEM, `${task}\n\n${input}`, mode === "translate" ? 400 : 1000);
+  return validateAIOutput(input, extractJson(text));
+}
+
+export interface BatchItem { title: string; description: string; lang?: string; sourceName?: string }
+
+const BATCH_SYSTEM = SYSTEM.replace(/أعد JSON فقط بالشكل:[^\n]*$/, "") +
+  `ستصلك عدة أخبار مرقّمة، ترجم كل خبر على حدة ولا تخلط بين الأخبار.
+أعد JSON فقط بالشكل: {"items":[{"i":1,"title":"...","summary":"..."}, ...]} بعنصر واحد لكل خبر وبالرقم نفسه.`;
+
+function extractBatchJson(s: string): unknown[] {
+  const m = s.match(/\{[\s\S]*\}|\[[\s\S]*\]/);
+  if (!m) return [];
+  try {
+    const j = JSON.parse(m[0]);
+    if (Array.isArray(j)) return j;
+    if (j && typeof j === "object" && "title" in j) return [{ i: 1, ...(j as object) }]; // single item answered without a wrapper
+    return Array.isArray((j as { items?: unknown }).items) ? (j as { items: unknown[] }).items : [];
+  } catch { return []; }
+}
+
+/** Translate several items in ONE request (free tiers limit requests per day, not items).
+ *  Each output is validated against its own input; a rejected item comes back as null. */
+export async function aiTranslateBatch(cfg: AIConfig, items: BatchItem[]): Promise<(AIResult | null)[]> {
+  if (cfg.provider === "none" || !items.length) return items.map(() => null);
+  const inputs = items.map((it) => aiInput(it.title, it.description, 600));
+  const blocks = items.map((it, k) => {
+    const from = it.lang && LANG_AR[it.lang] ? ` (من ${LANG_AR[it.lang]})` : "";
+    const src = it.sourceName ? ` — المصدر: ${it.sourceName}` : "";
+    return `### خبر ${k + 1}${from}${src}\n${inputs[k]}`;
+  });
+  const user = `ترجم الأخبار التالية إلى العربية. لكل خبر: عنوان مترجم، وملخص هو ترجمة مختصرة لنصه.\n\n${blocks.join("\n\n")}`;
+  const text = await callModel(cfg, BATCH_SYSTEM, user, Math.min(4000, 250 * items.length + 200));
+  const out: (AIResult | null)[] = items.map(() => null);
+  for (const raw of extractBatchJson(text)) {
+    const i = Number((raw as { i?: unknown })?.i);
+    if (!Number.isInteger(i) || i < 1 || i > items.length || out[i - 1]) continue;
+    out[i - 1] = validateAIOutput(inputs[i - 1], raw);
+  }
+  return out;
 }

@@ -4,7 +4,7 @@ import { canonicalUrl, safeUrl, sha256Hex } from "./url.ts";
 import { detectLanguage, jaccard, titleTokens, truncate } from "./text.ts";
 import { Category, classify, cleanHeadline, SourceInfo } from "./classify.ts";
 import { backoffMinutes, isTransientStatus, retryAfterSeconds, robotsAllows } from "./robots.ts";
-import { AIConfig, aiProcess, AIRateLimited, digitsIn } from "./ai.ts";
+import { AIConfig, aiProcess, AIRateLimited, aiTranslateBatch, digitsIn } from "./ai.ts";
 
 export const USER_AGENT = "LahzaNewsBot/1.0 (+https://github.com/; RSS reader; respects robots.txt)";
 
@@ -32,6 +32,8 @@ export interface Db {
   similar(titles: string[]): Promise<SimilarRow[]>;
   insertArticles(rows: Record<string, unknown>[]): Promise<number>;
   aiTake(n: number): Promise<number>;
+  aiRefund?(n: number): Promise<void>;
+  aiBackoff?(minutes: number): Promise<void>;
   backfillImages?(rows: { url_hash: string; image_url: string | null; summary: string | null }[]): Promise<number>;
   finishRun(runId: number, stats: Record<string, unknown>): Promise<void>;
 }
@@ -179,7 +181,15 @@ async function checkRobots(deps: Deps, src: SourceRow, now: Date): Promise<boole
   }
 }
 
-export const AI_MAX_PER_RUN = 8; // runs every minute; keeps under ~15 requests/min (Gemini free tier)
+/** Provider requests per run (the scheduler runs every minute). Free tiers cap requests per day, so
+ *  translations are batched: one request translates up to AI_BATCH_SIZE headlines. */
+export const AI_MAX_PER_RUN = 3;
+export const AI_BATCH_SIZE = 10;
+/** Older untranslated items are not worth a request: they are no longer news (and used to eat the
+ *  day's quota right after midnight, translating a 48-hour backlog). */
+export const TRANSLATE_MAX_AGE_HOURS = 6;
+/** Pause after the provider answers 429, instead of retrying every minute. */
+export const AI_BACKOFF_MINUTES = 15;
 
 export function sourceInfo(s: SourceRow): SourceInfo {
   return { kind: s.kind, reliability: s.reliability, default_category: s.default_category, topical: s.topical };
@@ -345,33 +355,69 @@ export async function runIngest(deps: Deps) {
       return true;
     });
 
-    // Optional AI: translation of non-Arabic items first, then summaries if enabled.
+    // Optional AI: translation of non-Arabic items first (batched), then summaries if enabled.
     if (deps.ai.provider !== "none" && fresh.length) {
-      const needTranslate = fresh.filter((c) => c.language !== "ar");
-      const needSummary = st.ai_summarize ? fresh.filter((c) => c.language === "ar" && (c.item.description?.length ?? 0) > 400 && c.source.allow_excerpt) : [];
-      // Newest first and capped per run, so free-tier rate limits (≈15 requests/min) are respected;
-      // anything left over is translated on the next run (every 2 minutes).
-      needTranslate.sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
-      const wanted = [...needTranslate, ...needSummary.slice(0, 10)].slice(0, AI_MAX_PER_RUN);
-      const granted = wanted.length ? await deps.db.aiTake(wanted.length) : 0;
-      for (const c of wanted.slice(0, granted)) {
-        try {
+      const maxAge = TRANSLATE_MAX_AGE_HOURS * 3600_000;
+      const needTranslate = fresh.filter((c) => c.language !== "ar" && now.getTime() - c.publishedAt.getTime() < maxAge);
+      // Flash/breaking feeds (shortest poll interval) first, then newest.
+      needTranslate.sort((a, b) => (a.source.poll_interval_minutes - b.source.poll_interval_minutes) || (b.publishedAt.getTime() - a.publishedAt.getTime()));
+      const batches: Candidate[][] = [];
+      for (let k = 0; k < needTranslate.length && batches.length < AI_MAX_PER_RUN; k += AI_BATCH_SIZE) batches.push(needTranslate.slice(k, k + AI_BATCH_SIZE));
+      const needSummary = st.ai_summarize
+        ? fresh.filter((c) => c.language === "ar" && (c.item.description?.length ?? 0) > 400 && c.source.allow_excerpt).slice(0, Math.max(0, AI_MAX_PER_RUN - batches.length))
+        : [];
+      const wanted = batches.length + needSummary.length;
+      const granted = wanted ? await deps.db.aiTake(wanted) : 0;
+      let used = 0;
+      try {
+        for (const batch of batches) {
+          if (used >= granted) break;
+          used++;
           stats.ai_calls++;
-          const mode = c.language !== "ar" ? "translate" : "summarize";
-          const res = await aiProcess(deps.ai, c.item.title, c.item.description || "", mode, { lang: c.language, sourceName: c.source.name_ar });
-          if (res) {
-            if (mode === "translate") {
-              c.titleOriginal = c.title; c.title = res.title; c.translated = true; c.tokens = titleTokens(res.title); c.digits = digitsIn(res.title);
-              // Keyword rules are Arabic, so classify again on the translation (category, breaking, attribution).
-              c.cls = classify(res.title, res.summary || "", c.item.categories, sourceInfo(c.source));
-              c.summary = null; c.summaryKind = "none"; // never keep the foreign-language excerpt
-            }
-            if (res.summary && c.source.allow_excerpt) { c.summary = res.summary; c.summaryKind = "ai"; }
+          let res: Awaited<ReturnType<typeof aiTranslateBatch>> = [];
+          try {
+            res = await aiTranslateBatch(deps.ai, batch.map((c) => ({ title: c.item.title, description: c.item.description || "", lang: c.language, sourceName: c.source.name_ar })));
+          } catch (e) {
+            if (e instanceof AIRateLimited) throw e;
+            log("ai error", (e as Error).message);
+            continue;
           }
-        } catch (e) {
-          log("ai error", (e as Error).message);
-          if (e instanceof AIRateLimited) break; // provider says slow down: stop for this run
+          batch.forEach((c, k) => {
+            const r = res[k];
+            if (!r) return;
+            c.titleOriginal = c.title; c.title = r.title; c.translated = true; c.tokens = titleTokens(r.title); c.digits = digitsIn(r.title);
+            // Keyword rules are Arabic, so classify again on the translation (category, breaking, attribution).
+            c.cls = classify(r.title, r.summary || "", c.item.categories, sourceInfo(c.source));
+            c.summary = r.summary && c.source.allow_excerpt ? r.summary : null; // never keep the foreign-language excerpt
+            c.summaryKind = c.summary ? "ai" : "none";
+          });
         }
+        for (const c of needSummary) {
+          if (used >= granted) break;
+          used++;
+          stats.ai_calls++;
+          try {
+            const r = await aiProcess(deps.ai, c.item.title, c.item.description || "", "summarize", { lang: c.language, sourceName: c.source.name_ar });
+            if (r?.summary) { c.summary = r.summary; c.summaryKind = "ai"; }
+          } catch (e) {
+            if (e instanceof AIRateLimited) throw e;
+            log("ai error", (e as Error).message);
+          }
+        }
+      } catch (e) {
+        // Provider said slow down (or the key is rejected): the refused request did not count, stop for a while.
+        log("ai error", (e as Error).message);
+        used--; stats.ai_calls--;
+        if (deps.db.aiBackoff) await deps.db.aiBackoff(AI_BACKOFF_MINUTES).catch((x) => log("ai backoff failed", (x as Error).message));
+      }
+      if (granted > used && deps.db.aiRefund) await deps.db.aiRefund(granted - used).catch((x) => log("ai refund failed", (x as Error).message));
+
+      // Items still untranslated but fresh enough: make sure they are seen again on the next poll even if the
+      // feed is unchanged (a 304 would otherwise hide them until the publisher updates the feed).
+      for (const c of needTranslate) {
+        if (c.translated) continue;
+        const ps = perSource.get(c.source.id);
+        if (ps) { ps.rec.etag = null; ps.rec.last_modified = null; }
       }
     }
 

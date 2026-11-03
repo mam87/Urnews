@@ -78,6 +78,15 @@ select pg_temp.ok(public.news_begin_ingest_run() is not null, 'stale crashed run
 select pg_temp.ok((select status from public.news_ingest_runs where id = 1) = 'error', 'crashed run marked error');
 
 select pg_temp.ok(public.news_ai_take(5) = 5 and public.news_ai_take(1000) = 295 and public.news_ai_take(1) = 0, 'AI daily budget enforced');
+select public.news_ai_refund(3);
+select pg_temp.ok(public.news_ai_take(10) = 3, 'unused AI reservations are refunded');
+select public.news_ai_refund(2);
+select public.news_ai_backoff(15);
+select pg_temp.ok(public.news_ai_take(1) = 0, 'AI paused during provider backoff');
+reset role;
+update public.news_settings set value = to_jsonb(now() - interval '1 minute') where key = 'ai_cooldown_until';
+set role service_role;
+select pg_temp.ok(public.news_ai_take(1) = 1, 'AI resumes after backoff');
 reset role;
 
 -- alerts / watchdog

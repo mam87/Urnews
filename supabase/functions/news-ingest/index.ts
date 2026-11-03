@@ -1,5 +1,5 @@
 // Edge Function: ingest
-// Invoked every 2 minutes by pg_cron (see migrations/..._scheduler.sql). Protected by a
+// Invoked every minute by pg_cron (see migrations/..._scheduler.sql). Protected by a
 // shared secret stored in Supabase Vault; overlapping calls are rejected by a DB lease.
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { Db, runIngest, Settings, SimilarRow, SourceRow } from "./lib/pipeline.ts";
@@ -35,6 +35,8 @@ function supabaseDb(sb: SupabaseClient): Db {
     similar: (titles) => rpc<SimilarRow[]>("news_similar_articles", { p_titles: titles, p_hours: 36 }),
     insertArticles: async (rows) => (await rpc<unknown[]>("news_insert_articles", { p_rows: rows })).length,
     aiTake: (n) => rpc<number>("news_ai_take", { p_n: n }),
+    aiRefund: (n) => rpc<void>("news_ai_refund", { p_n: n }),
+    aiBackoff: (m) => rpc<void>("news_ai_backoff", { p_minutes: m }),
     backfillImages: (rows) => rpc<number>("news_backfill_articles", { p_rows: rows }),
     finishRun: (id, stats) => rpc<void>("news_finish_ingest_run", { p_run: id, p: stats }),
   };

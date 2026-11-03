@@ -51,7 +51,12 @@ class FakeDb implements Db {
     }
     return n;
   }
-  async aiTake(n: number) { return n; }
+  aiBudget = Infinity;
+  aiUsed = 0;
+  backoffs: number[] = [];
+  async aiTake(n: number) { const g = Math.max(0, Math.min(n, this.aiBudget - this.aiUsed)); this.aiUsed += g; return g; }
+  async aiRefund(n: number) { this.aiUsed -= n; }
+  async aiBackoff(m: number) { this.backoffs.push(m); }
   async backfillImages(rows: { url_hash: string; image_url: string | null; summary: string | null }[]) {
     let n = 0;
     for (const r of rows) {
@@ -241,6 +246,47 @@ Deno.test("pipeline: Hebrew items are translated and reclassified, never publish
   assertEquals(art.title_original, "דיווח: פיצוץ בבסיס צבאי בצפון");
   assertEquals(art.language, "ar");
   assertEquals(art.summary, null);
+});
+
+Deno.test("pipeline: foreign items are translated in ONE batched request; unused quota is refunded", async () => {
+  const db = new FakeDb();
+  db.sources = [src(1, "he", { language: "he", poll_interval_minutes: 2 })];
+  const feed = () => new Response(rss([
+    { t: "פיצוץ בבסיס צבאי", l: "https://he.example/1" },
+    { t: "גשם כבד בצפון", l: "https://he.example/2" },
+    { t: "Old news item", l: "https://he.example/3", date: "Sat, 17 Oct 2026 01:00:00 GMT" }, // 8h old: not worth a request
+  ]), { headers: { etag: '"h1"' } });
+  const ai = aiConfigFromEnv((k) => ({ AI_PROVIDER: "anthropic", AI_API_KEY: "test" } as Record<string, string>)[k]);
+  const origFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = (async () => {
+    requests++;
+    return new Response(JSON.stringify({ content: [{ text: '{"items":[{"i":2,"title":"أمطار غزيرة في الشمال","summary":""},{"i":1,"title":"انفجار في قاعدة عسكرية","summary":""}]}' }] }));
+  }) as typeof fetch;
+  try {
+    await runIngest({ fetch: mockFetch({ "https://he.example/rss": feed }).f, db, ai, now: () => NOW, sleep });
+  } finally { globalThis.fetch = origFetch; }
+  assertEquals(requests, 1);
+  assertEquals(db.aiUsed, 1);
+  assertEquals(db.articles.map((a) => a.title).sort(), ["أمطار غزيرة في الشمال", "انفجار في قاعدة عسكرية"].sort());
+  assertEquals(db.fetches[0].etag, '"h1"'); // everything fresh was translated: keep the ETag
+});
+
+Deno.test("pipeline: provider 429 refunds the quota, pauses AI, and forces a full re-fetch next time", async () => {
+  const db = new FakeDb();
+  db.sources = [src(1, "he", { language: "he" })];
+  const feed = () => new Response(rss([{ t: "פיצוץ בבסיס צבאי", l: "https://he.example/1" }]), { headers: { etag: '"h1"' } });
+  const ai = aiConfigFromEnv((k) => ({ AI_PROVIDER: "anthropic", AI_API_KEY: "test" } as Record<string, string>)[k]);
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = (async () => new Response('{"error":"quota"}', { status: 429 })) as typeof fetch;
+  try {
+    await runIngest({ fetch: mockFetch({ "https://he.example/rss": feed }).f, db, ai, now: () => NOW, sleep });
+  } finally { globalThis.fetch = origFetch; }
+  assertEquals(db.articles.length, 0);
+  assertEquals(db.aiUsed, 0); // refused request is not counted against the daily budget
+  assertEquals(db.backoffs.length, 1);
+  assertEquals(db.fetches[0].etag, null); // a 304 must not hide the untranslated item
+  assertEquals(db.finished[0].ai_calls, 0);
 });
 
 Deno.test("pipeline: existing articles get a thumbnail later, never overwritten", async () => {
