@@ -9,9 +9,11 @@
   Migrations were applied by fetching the files from this repo at commit `93797ee` (md5 verified) and executing them.
 * **Edge Functions:** `news-ingest`, `news-notify` (JWT verification off; protected by the Vault token).
   The deployed entrypoint imports `lib/*.ts` from this repository pinned to commit
-  `eb1ee46c71f2ac22e0307a85b2facdc0aa62ac34`, so the running code is exactly the tested code.
+  `e8de9d83d5301a0f3c26f17a933d8a00201d31a7` (deployed 2026-11-03, version 10), so the running code is exactly the tested code.
   To deploy a new version: push, then redeploy with the new commit SHA in the import URLs
   (or run `scripts/build-functions.sh` and deploy the single-file bundle with the Supabase CLI).
+* **AI translation (2026-11-03):** batched (≤10 headlines per request, ≤3 requests per run), unused quota
+  refunded, 15-minute pause after a provider 429 (`ai_cooldown_until`), only items < 6 h old are translated.
 * **Scheduler:** pg_cron `news-ingest` every 1 min (was 2 min until 2026-10-28), `news-watchdog` every 5 min.
 * **Pending (needs a one-time approval in the Claude chat, because they contain DELETE statements):**
   the retention function `news_purge_old()` + its daily job, and the daily `cron.job_run_details` cleanup.
