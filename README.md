@@ -38,7 +38,7 @@ running.
 * Arabic/English switch (masthead), remembered per browser. English reports are kept in English for the
   English edition; top-ranked English-only events get an Arabic headline from the AI budget first.
 
-## Full original reports (2026-11-06, not yet deployed)
+## Full original reports (2026-11-06, deployed; writer off until an editor switches it on)
 * For important events with 3+ reports from 2+ independent publishers, an optional generator (`news-stories`)
   writes an **original** Arabic and English article from the stored headlines + publisher excerpts only:
   sections, timeline, labelled paragraphs (corroborated / statement / allegation / developing / analysis),

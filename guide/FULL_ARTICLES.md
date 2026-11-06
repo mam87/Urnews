@@ -1,7 +1,7 @@
 # Full original articles («تقارير كاملة») — design, safeguards and deployment
 
-Status: **implemented on branch `feature/full-article-engine`, tested, NOT deployed.**
-Nothing in the live Supabase project or on GitHub Pages changes until the steps at the end are run.
+Status: **deployed 2026-11-06, writer switched OFF** (`story_enabled = false`). Merged in PR #1 (`e59093e`);
+migration applied; Edge Function `news-stories` v1 live. Nothing is written until an editor switches the writer on.
 
 ## What it does
 For important events (already ranked by `news_global_events`), an optional generator writes an **original**
@@ -79,14 +79,15 @@ pending updates and internal notes are editor-only (admin RPCs). No direct UPDAT
 Cost: one request per article version (~3–5k input tokens, ≤ 3.5k output). With the current Gemini key on the free
 tier the requests share the existing daily quota; with a paid key the default caps bound spend.
 
-## Deployment (after review — not done)
-1. Merge the PR into `main` (GitHub Pages then serves the new article page and admin tab; with no published
-   stories the public site looks exactly as before).
-2. Apply `supabase/migrations/20261106000024_full_articles.sql` to project `ghxnmnydeuvnrsulywbj`.
-3. Deploy Edge Function `news-stories` (JWT verification **off** — it checks the Vault token or an editor JWT
-   itself), importing `lib/` pinned to the merged commit, or via `scripts/build-functions.sh`. Redeploy
-   `news-ingest` only if you want its `callModel` export (no behaviour change).
-4. Admin → التقارير الكاملة → «اكتب الآن» to test on current events; review the drafts.
-5. Turn on «تشغيل الكاتب الآلي» when satisfied.
+## Deployment (done 2026-11-06)
+1. PR #1 merged into `main` (`e59093e`); GitHub Pages serves the new article page and admin tab.
+2. Migration `20261106000024_full_articles.sql` applied to `ghxnmnydeuvnrsulywbj`; ingestion verified healthy afterwards.
+3. Edge Function `news-stories` v1 deployed (JWT verification off; it checks the Vault token or an editor JWT),
+   entrypoint importing `lib/` from GitHub pinned to `e59093ee4d8ae8b9f4cecbbb9d0b3697c0f37d22`.
+   Smoke test: scheduler call → 200 `story_enabled = false`, no AI use; anonymous call → 401.
+   `news-ingest` was not redeployed (its only change, exporting `callModel`, does not affect it).
+4. Next (editor): admin → التقارير الكاملة → tick «تشغيل الكاتب الآلي», then «اكتب الآن» or wait for the
+   10-minute run, and review the drafts. The button needs the writer switched on, because the AI budget
+   (`news_story_ai_take`) is zero while it is off. Switched on, it still only writes drafts.
 
 Rollback: set `story_enabled = false`; unpublish stories; the tables can be dropped without affecting the rest.

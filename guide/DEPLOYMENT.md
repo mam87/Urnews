@@ -71,3 +71,9 @@
   NHK World and Kyodo (404), News24 (403), GDACS (rejected), Rappler (robots.txt blocks AI crawlers).
 * English reports are now published in English (English edition) instead of being dropped when untranslated;
   the Arabic edition still shows only Arabic and translated reports. Hebrew remains translation-only.
+
+## Full original reports (2026-11-06)
+* **Migration applied:** `…24_full_articles.sql` (new `news_stor*` tables, settings, monthly AI cap; `news_ai_take` re-created).
+* **Edge Function `news-stories` v1** imports `lib/*.ts` pinned to commit `e59093ee4d8ae8b9f4cecbbb9d0b3697c0f37d22`; JWT verification off.
+* **pg_cron:** `news-stories-publish` every minute; `news-stories-generate` at minute 4, 14, 24… — calls out only while `story_enabled = true`.
+* **State:** `story_enabled = false` (writer off). Details and safeguards: `guide/FULL_ARTICLES.md`.
