@@ -158,7 +158,7 @@ async function loadLead() {
   if (!cat) loadSections();
 }
 
-const SECTION_ORDER = ["jordan", "palestine", "arab", "world", "economy", "weather", "sports", "tech", "health"];
+const SECTION_ORDER = ["jordan", "palestine", "arab", "world", "economy", "weather", "sports", "tech", "health", "security", "environment", "education", "entertainment"];
 async function loadSections() {
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
   const { data, error } = await sb.from("news_articles").select("id,source_id,title,summary,category,published_at,image_url,importance")

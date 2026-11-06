@@ -5,7 +5,7 @@ This guide takes the platform from an empty Supabase project to a running site, 
 ## 1. Architecture (and why it is the cheapest reliable option)
 
 ```
-            every 2 min                 HTTPS (x-ingest-token)
+            every 1 min                 HTTPS (x-ingest-token)
  pg_cron ─────────────► pg_net ───────────────────────────► Edge Function `ingest` ──► RSS feeds
  (inside Postgres)                                           │  parse · classify · dedupe · cluster
       │ every 5 min                                          │  optional AI (translate/summarise)
@@ -25,10 +25,10 @@ This guide takes the platform from an empty Supabase project to a running site, 
   * Free projects are **paused after ~7 days without API activity**. Real visitors and the
     GitHub healthcheck generate activity, but if the project is ever paused, ingestion stops.
     For a public launch, **Pro ($25/month) is recommended**: no pausing, daily backups.
-  * Edge Functions: the ingest job runs ~21,600 times/month (every 2 min) — inside the free quota.
+  * Edge Functions: the ingest job runs ~43,200 times/month (every minute) — inside the free quota (500k/month).
     Each run processes at most `max_sources_per_run` feeds to stay inside the per-request CPU limit.
   * Database 500 MB (free). Articles are purged after `retention_days` (30); expect ~50–150 MB.
-  * Realtime: one broadcast per ingest run with new items (≤ 720/day) × connected viewers.
+  * Realtime: one broadcast per ingest run with new items (≤ 1,440/day) × connected viewers.
 
 ## 2. One-time setup
 
@@ -46,7 +46,7 @@ This guide takes the platform from an empty Supabase project to a running site, 
    scripts/render-scheduler.sh https://<ref>.supabase.co > /tmp/scheduler.sql   # then run it in the SQL editor
    ```
    This enables `pg_cron`/`pg_net`, stores `project_url` and a random `ingest_token` in **Vault**, and schedules:
-   `news-ingest` (*/2 min), `news-watchdog` (*/5 min), `news-retention` (daily), `news-cron-cleanup` (daily).
+   `news-ingest` (*/2 min; migration 16 changes it to every minute), `news-watchdog` (*/5 min), `news-retention` (daily), `news-cron-cleanup` (daily).
 5. Authentication → Providers → Email: keep enabled. **After you have created your own admin account
    (step 2.3), turn OFF "Allow new users to sign up".** Set Site URL to your GitHub Pages URL.
 
@@ -141,8 +141,8 @@ select * from alerts where resolved_at is null;
 
 ## 5. Tests
 ```bash
-(cd supabase/functions/news-ingest && deno test -A tests/)          # 30 pipeline tests
-PGHOST=… PGPORT=… tests/run-sql-tests.sh                        # 75+ DB/RLS tests on a throwaway Postgres
-node tests/ui/smoke.mjs <site-dir> <out-dir>                    # 60 browser checks against a mocked API
+(cd supabase/functions/news-ingest && deno test -A tests/)          # 45 pipeline/classifier tests
+PGHOST=… PGPORT=… tests/run-sql-tests.sh                        # 95+ DB/RLS/scheduler tests on a throwaway Postgres
+node tests/ui/smoke.mjs "$(pwd)" <out-dir>                     # 86 browser checks (absolute site path; PW_CHROMIUM=/path/to/chrome optional)
 ```
 CI runs the first two on every push (`.github/workflows/ci.yml`).

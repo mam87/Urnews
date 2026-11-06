@@ -12,6 +12,7 @@ export const ARTICLE_COLS = "id,source_id,url,title,title_original,summary,summa
 export const CATEGORIES = [
   ["jordan", "الأردن"], ["palestine", "فلسطين"], ["arab", "العالم العربي"], ["world", "دولي"], ["politics", "سياسة"],
   ["economy", "اقتصاد وأعمال"], ["tech", "تكنولوجيا وذكاء اصطناعي"], ["health", "صحة وعلوم"], ["sports", "رياضة"], ["weather", "طقس"],
+  ["environment", "بيئة ومناخ"], ["education", "تعليم"], ["security", "أمن وجريمة"], ["entertainment", "فن وثقافة"],
 ];
 export const CAT_NAME = Object.fromEntries(CATEGORIES);
 

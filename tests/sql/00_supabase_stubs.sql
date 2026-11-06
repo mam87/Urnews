@@ -29,3 +29,18 @@ grant usage on schema realtime to service_role, authenticated; grant select on r
 create table public.lg_existing (id int primary key, note text);
 insert into public.lg_existing values (1, 'existing app data');
 create function public.lg_existing_fn() returns int language sql as $$ select 42 $$;
+-- pg_cron stand-in (migrations since 2026-10-28 reschedule jobs directly; the real extension needs Supabase).
+create schema cron;
+create table cron.job (jobid bigserial primary key, jobname text unique, schedule text not null, command text not null, active boolean not null default true);
+create table cron.job_run_details (runid bigserial primary key, jobid bigint, status text, return_message text, start_time timestamptz, end_time timestamptz);
+create function cron.schedule(p_name text, p_schedule text, p_command text) returns bigint language sql as $$
+  insert into cron.job (jobname, schedule, command) values (p_name, p_schedule, p_command)
+  on conflict (jobname) do update set schedule = excluded.schedule, command = excluded.command returning jobid $$;
+create function cron.unschedule(p_name text) returns boolean language sql as $$
+  with d as (delete from cron.job where jobname = p_name returning 1) select exists (select 1 from d) $$;
+-- the jobs the scheduler migration creates (it needs Vault + pg_net, so it is not applied here)
+insert into cron.job (jobname, schedule, command) values
+  ('news-ingest', '*/2 * * * *', ' select public.news_call_edge_function(''news-ingest''); '),
+  ('news-watchdog', '*/5 * * * *', ' select public.news_watchdog(); '),
+  ('news-retention', '17 1 * * *', ' select public.news_purge_old(); '),
+  ('news-cron-cleanup', '23 1 * * *', ' delete from cron.job_run_details where end_time < now() - interval ''3 days''; ');

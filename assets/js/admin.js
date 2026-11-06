@@ -33,6 +33,7 @@ async function overview() {
   const healthy = lastOk && Date.now() - new Date(lastOk).getTime() < 15 * 60_000;
   const stat = (k, v, cls = "") => h("div", { class: "stat" }, h("div", { class: "v num " + cls }, v ?? "—"), h("div", { class: "k" }, k));
   const max = Math.max(1, ...s.hourly_24h.map((x) => x.n));
+  const sch = s.scheduler || {};
   body().replaceChildren(
     h("div", { class: "stats" },
       stat("حالة الجلب", healthy ? "يعمل" : "متوقف", healthy ? "status-ok" : "status-bad"),
@@ -40,7 +41,14 @@ async function overview() {
       stat("تشغيلات 24 ساعة", s.runs_24h), stat("تشغيلات فاشلة", s.runs_failed_24h, s.runs_failed_24h ? "status-warn" : ""),
       stat("أخبار جديدة 24 ساعة", s.articles_24h), stat("مكررات مُنعت", s.duplicates_24h),
       stat("عاجل الآن", s.breaking_now), stat("قيد المراجعة", s.pending), stat("استدعاءات AI اليوم", s.ai_today ?? 0),
-      stat("إجمالي الأخبار", s.articles_total), stat("حجم القاعدة", s.db_size)),
+      stat("إجمالي الأخبار", s.articles_total), stat("حجم القاعدة", s.db_size),
+      stat("التشغيل القادم", sch.next_ingest_at ? time(sch.next_ingest_at) : "—"),
+      stat("المجدول", !sch.available ? "غير متاح" : sch.ingest_active ? "نشط" : "موقوف", !sch.available || !sch.ingest_active ? "status-bad" : "status-ok"),
+      stat("أعطال المجدول 24 ساعة", sch.cron_failures_24h ?? "—", sch.cron_failures_24h ? "status-warn" : ""),
+      stat("مصادر فعّالة", s.sources_active), stat("مصادر متعثرة", s.sources_failing, s.sources_failing ? "status-warn" : ""),
+      stat("أخطاء جلب 24 ساعة", s.fetch_errors_24h), stat("عناصر متجاهلة (موجودة/قديمة)", s.ignored_24h)),
+    sch.available ? h("p", { class: "note" }, `جدول الجلب: ${sch.ingest_schedule} (كل ${s.interval_minutes ?? "?"} دقيقة) — المهام: `,
+      (sch.jobs || []).map((j) => `${j.name} ${j.schedule}${j.active ? "" : " (موقوفة)"}`).join(" · ")) : null,
     h("section", { class: "panel", style: "background:var(--bg-2);border:1px solid var(--rule);border-radius:10px;padding:16px;margin-bottom:20px" },
       h("h3", { style: "margin:0;font-size:15px" }, "الأخبار المضافة لكل ساعة (24 ساعة)"),
       h("div", { class: "bars" }, s.hourly_24h.map((x) => h("span", { style: `height:${(x.n / max) * 100}%`, title: `${time(x.h)}: ${x.n}` })))),

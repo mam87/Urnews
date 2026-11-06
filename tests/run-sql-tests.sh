@@ -13,6 +13,8 @@ for f in supabase/migrations/*.sql; do
   case "$f" in *scheduler*|*sources*) continue;; esac
   $P -d $DB -f "$f" >/dev/null
 done
+# Some feature migrations also seed real sources; the DB tests use their own fixtures (ids 1, 2).
+$P -d $DB -c "truncate public.news_sources restart identity cascade" >/dev/null
 $P -At -d $DB -f tests/sql/10_db_tests.sql 2>&1 >/dev/null | sed -E "s/^psql:[^ ]+ (NOTICE|WARNING):  /  /" | grep -v "already exists"
 
 # Seed data must also apply cleanly (validates feed URL / interval constraints).

@@ -77,6 +77,7 @@ update public.news_ingest_runs set status = 'running', finished_at = null, start
 select pg_temp.ok(public.news_begin_ingest_run() is not null, 'stale crashed run is closed and a new run can start');
 select pg_temp.ok((select status from public.news_ingest_runs where id = 1) = 'error', 'crashed run marked error');
 
+update public.news_settings set value = '300' where key = 'ai_daily_limit'; -- later migrations raised the default
 select pg_temp.ok(public.news_ai_take(5) = 5 and public.news_ai_take(1000) = 295 and public.news_ai_take(1) = 0, 'AI daily budget enforced');
 select public.news_ai_refund(3);
 select pg_temp.ok(public.news_ai_take(10) = 3, 'unused AI reservations are refunded');
@@ -178,11 +179,28 @@ insert into public.news_sources (slug, name_ar, homepage, feed_url) values ('gam
 select pg_temp.fails($$insert into public.news_sources (slug, name_ar, homepage, feed_url) values ('bad', 'سيء', 'https://b.example/', 'javascript:alert(1)')$$, 'non-http feed URL rejected');
 select pg_temp.ok(jsonb_array_length(public.news_admin_sources()) = 3, 'admin_sources lists all sources');
 select pg_temp.ok((public.news_admin_stats() ->> 'articles_total')::int = 6, 'admin_stats works for admins');
+select pg_temp.ok((public.news_admin_stats() -> 'scheduler' ->> 'ingest_schedule') = '* * * * *' and (public.news_admin_stats() ->> 'sources_active') is not null and (public.news_admin_stats() ->> 'ignored_24h') is not null, 'admin_stats exposes scheduler health, source counts, ignored items');
 update public.news_settings set value = '10' where key = 'max_sources_per_run';
 select pg_temp.fails($$update public.news_settings set key = 'x' where key = 'max_sources_per_run'$$, 'settings keys immutable');
 delete from public.news_admins where user_id = '00000000-0000-0000-0000-00000000000a';
 reset role;
 select pg_temp.ok(exists (select 1 from public.news_admins where role = 'owner'), 'editor cannot remove owner (RLS: 0 rows)');
+reset role;
+
+
+-- 2026-11-06: scheduler configuration, new sections, monitoring
+select pg_temp.ok((select schedule from cron.job where jobname = 'news-ingest') = '* * * * *', 'news-ingest runs every minute');
+select pg_temp.ok((select count(*) from cron.job where jobname = 'news-ingest') = 1, 'exactly one ingest job (no duplicate scheduler)');
+select pg_temp.ok((select count(*) from cron.job where jobname in ('news-watchdog','news-retention','news-cron-cleanup') and active) = 3, 'watchdog, retention and cleanup jobs preserved');
+select pg_temp.ok((select value::text from public.news_settings where key = 'scheduler_interval_minutes') = '1', 'scheduler_interval_minutes matches cron');
+select pg_temp.ok((select min(min_interval_minutes) from public.news_sources) >= 1, 'per-source intervals compatible with a 1-minute scheduler');
+select pg_temp.ok((public.news_scheduler_status() ->> 'next_ingest_at')::timestamptz between now() and now() + interval '1 minute', 'next scheduled ingestion is within a minute');
+select pg_temp.ok((select count(*) from public.news_categories where slug in ('environment','education','security','entertainment')) = 4, 'four new sections exist');
+select pg_temp.ok((select count(*) from public.news_categories) = 14, 'no duplicate sections (14 = 10 existing + 4 new)');
+set role anon;
+select pg_temp.fails($$select public.news_scheduler_status()$$, 'anon cannot read scheduler internals');
+select pg_temp.fails($$select public.news_admin_stats()$$, 'anon cannot read admin stats');
+select pg_temp.fails($$select * from cron.job$$, 'anon cannot read cron.job');
 reset role;
 
 -- retention & time zone

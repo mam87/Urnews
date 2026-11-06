@@ -265,3 +265,34 @@ Deno.test("classify puts weather news in the weather section", () => {
   assertEquals(c.category, "weather");
   assertEquals(classify("ارتفاع أسعار النفط في الأسواق العالمية", "", [], media).category, "economy");
 });
+
+Deno.test("classify (Arabic): new sections — environment, education, entertainment, security", () => {
+  assertEquals(classify("الأمم المتحدة تحذر من مخاطر التغير المناخي وارتفاع الانبعاثات", "", [], media).category, "environment");
+  assertEquals(classify("وزارة التربية تعلن موعد امتحانات التوجيهي", "تبدأ امتحانات الثانوية العامة للطلبة", [], media).category, "education");
+  assertEquals(classify("فيلم أردني يفوز بجائزة في مهرجان القاهرة السينمائي", "", [], media).category, "entertainment");
+  // Security with no place name → security; a strike in Gaza stays in Palestine (security only as a tag).
+  assertEquals(classify("الشرطة تلقي القبض على متهمين بتهريب المخدرات", "", [], media).category, "security");
+  const gaza = classify("الأمن العام: القبض على مطلوب في غزة وقطاع غزة", "", [], media);
+  assertEquals(gaza.category, "palestine");
+  assert(gaza.categories.includes("security"));
+  // Ambiguous words do not misfire: Arab League ≠ university, "demanded" ≠ student, landmarks ≠ teachers.
+  for (const t of ["الجامعة العربية تدعو إلى وقف القتال", "طالب الرئيس بوقف الحرب", "تصنيف المبنى ومعلمين وطنيين"]) {
+    const c = classify(t, "", [], media);
+    assertFalse(c.categories.includes("education"), t);
+  }
+});
+
+Deno.test("classify (English): keywords route untranslated English items", () => {
+  assertEquals(classify("Police arrest five over drug smuggling ring", "", [], media).category, "security");
+  assertEquals(classify("Wildfire and drought: climate change hits biodiversity", "", [], media).category, "environment");
+  assertEquals(classify("Universities face exams chaos as teachers strike", "", [], media).category, "education");
+  assertEquals(classify("Oscar-winning actress joins Netflix film", "", [], media).category, "entertainment");
+  assertEquals(classify("Russia and Ukraine agree to ceasefire talks", "", [], media).category, "world");
+});
+
+Deno.test("duplicate articles: the same DW article from two DW feeds has one canonical URL", () => {
+  assertEquals(
+    canonicalUrl("https://www.dw.com/ar/a-79866844?maca=ara-rss-ar-sci-1041-rdf"),
+    canonicalUrl("https://www.dw.com/ar/a-79866844?maca=ara-rss-ar-all-1127-rdf"),
+  );
+});

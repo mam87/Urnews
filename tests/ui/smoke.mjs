@@ -108,6 +108,7 @@ for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["desktop", {
   await page.waitForTimeout(1500);
   const pill = await page.locator("#live-pill").getAttribute("data-state");
   check(pill === "polling" || pill === "connecting", `${name}: realtime blocked => polling fallback (${pill})`);
+  check(await page.evaluate(() => ["environment", "education", "security", "entertainment"].every((c) => document.querySelector(`.catnav a[data-cat="${c}"]`))), `${name}: new sections in category navigation`);
   check((await page.locator("#live-pill").textContent()).includes("آخر تحديث") || name === "mobile", `${name}: last-updated time visible`);
   await page.screenshot({ path: `${outDir}/home-${name}.png`, fullPage: false });
 

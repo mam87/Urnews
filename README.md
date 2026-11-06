@@ -6,7 +6,7 @@ labels how well-sourced each item is, and pushes updates to open browsers, with 
 running.
 
 * **Frontend:** static HTML/CSS/JS on GitHub Pages: RTL, mobile-first, dark mode, live ticker,
-  live feed with pause, search, 9 categories, breaking timeline, article page, admin dashboard.
+  live feed with pause, search, 14 sections, breaking timeline, article page, admin dashboard.
 * **Backend:** Supabase Postgres (RLS on every table) + `pg_cron` + Edge Functions (`ingest`, `notify`).
 * **Cost:** $0 on free tiers (with limits listed in `guide/SETUP.md`), or about $25/month on Supabase Pro.
 
@@ -18,6 +18,12 @@ running.
 | `assets/js/` | Site + admin (vanilla ES modules, vendored supabase-js) |
 | `tests/` | SQL/RLS tests, UI smoke tests; Deno tests live in `supabase/functions/news-ingest/tests/` |
 | `guide/SETUP.md` | Setup, adding sources, rotating keys, backups/restore, costs |
+
+## Sections
+Jordan · Palestine · Arab world / Middle East · World · Politics · Economy & Business · Tech & AI ·
+Health & Science · Sports · Weather · Environment & Climate · Education · Security & Crime · Arts & Culture.
+"Breaking" is a flag on any article (ticker + `breaking.html`), not a separate section. Security is a
+secondary tag: a strike in Gaza stays under Palestine and is also tagged *security*.
 
 ## Editorial rules enforced in code
 * Only headline + short publisher-provided excerpt + link to the original + original publication time.

@@ -2,11 +2,15 @@
 // Deliberately conservative: nothing is ever auto-labelled "confirmed".
 import { normalizeArabic } from "./text.ts";
 
-export type Category = "jordan" | "palestine" | "arab" | "world" | "politics" | "economy" | "tech" | "health" | "sports" | "weather";
+export type Category = "jordan" | "palestine" | "arab" | "world" | "politics" | "economy" | "tech" | "health" | "sports" | "weather"
+  | "entertainment" | "security" | "education" | "environment";
 export type Verification = "official" | "statement" | "allegation" | "developing" | "reported" | "confirmed";
 
 export const GEO: Category[] = ["jordan", "palestine", "arab", "world"];
-export const TOPICAL: Category[] = ["weather", "sports", "tech", "health", "economy", "politics"];
+export const TOPICAL: Category[] = ["weather", "sports", "tech", "health", "economy", "environment", "education", "entertainment", "politics"];
+/** Secondary tags: added to `categories` when strong, but never chosen over a geographic section
+ *  (otherwise every strike/raid headline would leave Palestine/World for "security"). */
+export const SECONDARY: Category[] = ["politics", "security"];
 
 const KEYWORDS: Record<Category, string[]> = {
   jordan: ["الأردن", "الاردن", "أردني", "أردنية", "الأردنيين", "الملك عبدالله الثاني", "الملك عبد الله الثاني", "ولي العهد الأمير الحسين", "الزرقاء", "إربد", "العقبة", "السلط", "الكرك", "معان", "مادبا", "جرش", "عجلون", "المفرق", "الطفيلة", "البلقاء", "النشامى", "مجلس النواب الأردني", "الحكومة الأردنية", "رئيس الوزراء جعفر حسان", "بترا", "Jordan", "Jordanian", "Amman"],
@@ -16,8 +20,12 @@ const KEYWORDS: Record<Category, string[]> = {
   politics: ["الرئيس", "رئيس الوزراء", "الحكومة", "البرلمان", "مجلس النواب", "مجلس الشيوخ", "الانتخابات", "انتخابات", "وزير الخارجية", "الدبلوماسية", "مفاوضات", "اتفاق", "قمة", "عقوبات", "سفير", "وقف إطلاق النار", "الهدنة", "حزب", "معارضة", "استفتاء", "قرار أممي", "election", "president", "parliament", "minister", "ceasefire", "sanctions", "diplomatic"],
   economy: ["اقتصاد", "الاقتصاد", "اقتصادي", "اقتصادية", "البورصة", "الأسهم", "بورصة عمان", "النفط", "برنت", "الذهب", "الدولار", "الدينار", "اليورو", "التضخم", "الفائدة", "البنك المركزي", "الاحتياطي الفيدرالي", "صندوق النقد", "البنك الدولي", "الاستثمار", "الصادرات", "الواردات", "الموازنة", "العجز", "الناتج المحلي", "الأسعار", "المحروقات", "الضرائب", "الجمارك", "الشركات", "أرباح", "مليار دولار", "مليون دينار", "economy", "inflation", "stocks", "oil prices", "IMF", "GDP"],
   tech: ["الذكاء الاصطناعي", "تكنولوجيا", "التكنولوجيا", "تقنية", "التقنية", "تطبيق", "هاتف ذكي", "آيفون", "أندرويد", "آبل", "غوغل", "جوجل", "مايكروسوفت", "ميتا", "سامسونغ", "إنفيديا", "أوبن إيه آي", "تشات جي بي تي", "شات جي بي تي", "الأمن السيبراني", "اختراق", "قرصنة", "الإنترنت", "رقمي", "رقمية", "الروبوت", "الرقائق", "أشباه الموصلات", "ChatGPT", "OpenAI", "Nvidia", "Apple", "Google", "Microsoft", "AI ", "artificial intelligence", "cyber"],
-  health: ["الصحة", "صحة", "صحي", "وزارة الصحة", "منظمة الصحة العالمية", "مستشفى", "المستشفيات", "مرض", "أمراض", "وباء", "فيروس", "لقاح", "اللقاحات", "السرطان", "السكري", "الكوليرا", "الحصبة", "دواء", "أدوية", "طبي", "طبية", "الأطباء", "علماء", "دراسة", "الباحثون", "العلوم", "الفضاء", "ناسا", "كوكب", "المناخ", "الاحتباس الحراري", "اكتشاف", "health", "WHO", "vaccine", "disease", "study finds", "scientists", "NASA"],
+  health: ["الصحة", "صحة", "صحي", "وزارة الصحة", "منظمة الصحة العالمية", "مستشفى", "المستشفيات", "مرض", "أمراض", "وباء", "فيروس", "لقاح", "اللقاحات", "السرطان", "السكري", "الكوليرا", "الحصبة", "دواء", "أدوية", "طبي", "طبية", "الأطباء", "علماء", "دراسة", "الباحثون", "العلوم", "الفضاء", "ناسا", "كوكب", "اكتشاف", "health", "WHO", "vaccine", "disease", "study finds", "scientists", "NASA"],
   weather: ["الطقس", "طقس", "حالة الطقس", "الأرصاد الجوية", "دائرة الأرصاد", "الأرصاد", "منخفض جوي", "المنخفض الجوي", "كتلة هوائية", "الكتلة الهوائية", "موجة حارة", "موجة حر", "موجة باردة", "أمطار", "الأمطار", "زخات", "ثلوج", "الثلوج", "تساقط الثلوج", "الصقيع", "عاصفة رملية", "عاصفة ثلجية", "عاصفة مطرية", "درجات الحرارة", "درجة مئوية", "الضباب", "السيول", "سيول", "الفيضانات", "إعصار", "الإعصار", "عاصفة استوائية", "عدم الاستقرار الجوي", "عواصف رعدية", "زخات رعدية", "مدى الرؤية", "weather", "heatwave", "snowfall", "rainfall", "hurricane", "typhoon", "storm", "floods"],
+  environment: ["البيئة", "بيئي", "بيئية", "وزارة البيئة", "المناخ", "التغير المناخي", "تغير المناخ", "الاحتباس الحراري", "الانبعاثات", "انبعاثات الكربون", "التلوث", "تلوث", "التصحر", "الجفاف", "شح المياه", "المياه الجوفية", "الطاقة المتجددة", "الطاقة الشمسية", "طاقة الرياح", "الغابات", "حرائق الغابات", "التنوع البيولوجي", "الحياة البرية", "النفايات", "إعادة التدوير", "مؤتمر المناخ", "climate", "climate change", "emissions", "pollution", "renewable", "biodiversity", "drought", "wildfire", "deforestation", "COP30", "COP31"],
+  education: ["التعليم", "تعليم", "التربية والتعليم", "وزارة التربية", "وزارة التعليم العالي", "التعليم العالي", "الجامعات", "جامعات", "الجامعة الأردنية", "جامعة اليرموك", "طلبة", "الطلبة", "الطلاب", "المدارس", "مدرسة", "المعلمين", "نقابة المعلمين", "التوجيهي", "امتحانات", "الامتحانات", "امتحان", "القبول الموحد", "منح دراسية", "المنح", "بعثات", "العام الدراسي", "الفصل الدراسي", "school", "schools", "students", "university", "universities", "education", "teachers", "exams"],
+  entertainment: ["فن", "الفن", "فنان", "فنانة", "الفنان", "الفنانة", "فني", "فنية", "مهرجان", "المهرجان", "فيلم", "الفيلم", "أفلام", "سينما", "السينما", "مسلسل", "المسلسل", "مسلسلات", "دراما", "الدراما", "مطرب", "مطربة", "أغنية", "ألبوم", "حفل", "حفلة", "حفلات", "مسرح", "المسرح", "الممثل", "الممثلة", "ممثل", "ممثلة", "الأوسكار", "جائزة غرامي", "غرامي", "نتفليكس", "هوليوود", "Netflix", "Hollywood", "Oscar", "Oscars", "Grammy", "film", "movie", "actor", "actress", "singer", "album", "festival", "celebrity"],
+  security: ["الأمن العام", "مديرية الأمن العام", "الشرطة", "شرطة", "الأجهزة الأمنية", "أمني", "أمنية", "جريمة", "جرائم", "الجريمة", "جنائي", "القبض", "القبض على", "مخدرات", "المخدرات", "تهريب", "مهربين", "إرهاب", "الإرهاب", "إرهابي", "إرهابية", "خلية", "اعتقال", "اعتقل", "حملة اعتقالات", "سرقة", "احتيال", "إطلاق نار", "الدفاع المدني", "حادث سير", "حوادث السير", "الأمن السيبراني", "هجوم سيبراني", "هجوم إلكتروني", "اختراق", "police", "arrested", "arrest", "crime", "terrorism", "terror", "smuggling", "drugs", "shooting", "cyberattack", "security forces"],
   sports: ["رياضة", "الرياضة", "رياضي", "كرة القدم", "كرة السلة", "مباراة", "المباراة", "الدوري", "دوري", "كأس", "بطولة", "منتخب", "المنتخب", "النشامى", "أهداف", "مدرب", "لاعب", "اللاعب", "نادي", "النادي", "الفيصلي", "الوحدات", "ريال مدريد", "برشلونة", "ليفربول", "مانشستر", "الهلال", "النصر", "الأهلي", "الزمالك", "ميسي", "رونالدو", "صلاح", "فيفا", "الاتحاد الآسيوي", "الأولمبية", "الأولمبياد", "فورمولا", "التنس", "Premier League", "FIFA", "football", "Olympic"],
 };
 
@@ -71,12 +79,12 @@ export function classify(title: string, description: string, feedCategories: str
   if (src.default_category && src.topical) scores[src.default_category] += 4;
 
   const best = (list: Category[]) => list.reduce<Category | null>((a, c) => (scores[c] > 0 && (!a || scores[c] > scores[a]) ? c : a), null);
-  const topical = best(TOPICAL.filter((c) => c !== "politics"));
+  const topical = best(TOPICAL.filter((c) => !SECONDARY.includes(c)));
   const geo = best(GEO);
   let primary: Category;
   if (topical && scores[topical] >= 3) primary = topical;
   else if (geo && scores[geo] >= 2) primary = geo;
-  else if (scores.politics >= 3) primary = "politics";
+  else if (scores.politics >= 3 || scores.security >= 3) primary = scores.security > scores.politics ? "security" : "politics";
   else primary = src.default_category ?? geo ?? topical ?? "world";
 
   const cats = new Set<Category>([primary]);

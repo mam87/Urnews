@@ -1,6 +1,6 @@
 // URL validation and canonicalization for duplicate prevention.
 
-const TRACKING_PARAMS = /^(utm_[a-z]+|fbclid|gclid|dclid|mc_cid|mc_eid|ocid|cmpid|at_medium|at_campaign|at_custom\d*|xtor|ns_[a-z]+|ref|ref_src|src|share|amp|_ga|igshid|s_cid)$/i;
+const TRACKING_PARAMS = /^(utm_[a-z]+|fbclid|gclid|dclid|mc_cid|mc_eid|ocid|cmpid|at_medium|at_campaign|at_custom\d*|xtor|ns_[a-z]+|ref|ref_src|src|share|amp|_ga|igshid|s_cid|maca)$/i; // maca: DW per-feed tag (same article in several DW feeds)
 
 /** Returns an absolute https/http URL or null. Rejects javascript:, data:, credentials, etc. */
 export function safeUrl(raw: unknown, base?: string): string | null {
