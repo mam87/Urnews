@@ -4,10 +4,22 @@ import { renderChrome, fetchStatus, ICONS } from "./layout.js";
 import { card, leadBlock, rankScore, sectionBlock } from "./cards.js";
 import { Live } from "./live.js";
 import { weatherPanel } from "./weather.js";
+import { EN, L, REGION_NAME, countryName, flag, isCountry, langFilter, inLang } from "./i18n.js";
+import { fetchGlobalEvents, eventRow } from "./global.js";
 
 const params = new URLSearchParams(location.search);
 const cat = CAT_NAME[params.get("cat")] ? params.get("cat") : null;
 const q = (params.get("q") || "").trim().slice(0, 100);
+const region = REGION_NAME[params.get("region")] ? params.get("region") : null;
+const country = isCountry(params.get("country")) ? params.get("country") : null;
+const geoName = country ? `${flag(country)} ${countryName(country)}` : region ? REGION_NAME[region] : null;
+/** Category + region/country + language restrictions shared by every article query on this page. */
+function scope(qb) {
+  if (cat) qb = qb.contains("categories", [cat]);
+  if (region) qb = qb.eq("region", region);
+  if (country) qb = qb.contains("countries", [country]);
+  return langFilter(qb);
+}
 const PAGE = 30;
 
 const chrome = renderChrome({ active: "home" });
@@ -26,9 +38,7 @@ const state = {
 };
 
 function baseQuery() {
-  let qb = sb.from("news_articles").select(ARTICLE_COLS).eq("status", "published").is("duplicate_of", null);
-  if (cat) qb = qb.contains("categories", [cat]);
-  return qb;
+  return scope(sb.from("news_articles").select(ARTICLE_COLS).eq("status", "published").is("duplicate_of", null));
 }
 
 async function loadClusterSizes(rows) {
@@ -38,18 +48,18 @@ async function loadClusterSizes(rows) {
   for (const c of data || []) state.clusterSize.set(c.id, c.source_count);
 }
 
-const title = cat ? CAT_NAME[cat] : q ? `نتائج البحث: ${q}` : "آخر الأخبار";
-document.title = `${cat ? CAT_NAME[cat] + " — " : q ? "بحث — " : ""}لحظة`;
+const title = [cat ? CAT_NAME[cat] : null, geoName].filter(Boolean).join(" · ") || (q ? L(`نتائج البحث: ${q}`, `Search results: ${q}`) : L("آخر الأخبار من العالم", "Latest news worldwide"));
+document.title = `${cat || geoName ? title + " — " : q ? L("بحث — ", "Search — ") : ""}${L("لحظة", "Lahza")}`;
 
 const feedEl = h("ul", { class: "feed", id: "feed", "aria-live": "off" });
 const bannerBtn = h("button", { type: "button", onclick: () => flushQueue(true) });
 const banner = h("div", { class: "new-banner", hidden: true }, bannerBtn);
-const pauseBtn = h("button", { class: "btn", type: "button", "aria-pressed": "false", title: "إيقاف/استئناف التحديث المباشر" }, ICONS.pause(), "إيقاف التحديث");
-const sortSeg = h("div", { class: "seg", role: "group", "aria-label": "ترتيب" },
-  h("button", { type: "button", "aria-pressed": String(state.sort === "latest"), dataset: { sort: "latest" } }, "الأحدث"),
-  h("button", { type: "button", "aria-pressed": String(state.sort === "top"), dataset: { sort: "top" } }, "الأهم"));
+const pauseBtn = h("button", { class: "btn", type: "button", "aria-pressed": "false", title: L("إيقاف/استئناف التحديث المباشر", "Pause/resume live updates") }, ICONS.pause(), L("إيقاف التحديث", "Pause updates"));
+const sortSeg = h("div", { class: "seg", role: "group", "aria-label": L("ترتيب", "Sort") },
+  h("button", { type: "button", "aria-pressed": String(state.sort === "latest"), dataset: { sort: "latest" } }, L("الأحدث", "Latest")),
+  h("button", { type: "button", "aria-pressed": String(state.sort === "top"), dataset: { sort: "top" } }, L("الأهم", "Top")));
 const metaEl = h("span", { class: "meta num" });
-const loadMoreBtn = h("button", { class: "btn", type: "button", onclick: () => loadMore() }, "المزيد من الأخبار");
+const loadMoreBtn = h("button", { class: "btn", type: "button", onclick: () => loadMore() }, L("المزيد من الأخبار", "More news"));
 const loadMore_ = h("div", { class: "load-more", hidden: true }, loadMoreBtn);
 const leadSlot = h("div");
 const sectionsSlot = h("div");
@@ -63,16 +73,16 @@ function layout() {
     h("div", { class: "grid" },
       h("div", {},
         q ? null : leadSlot,
-        q || cat ? null : sectionsSlot,
+        q || cat || region || country ? null : sectionsSlot,
         h("div", { class: "section-head" }, h("h2", {}, title), metaEl,
           q ? null : h("div", { class: "tools" }, sortSeg, pauseBtn)),
         banner, feedEl, loadMore_),
       h("aside", {},
-        h("section", { class: "panel" }, h("h2", {}, h("span", { class: "chip breaking" }, "عاجل"), "الآن"), breakingPanel,
-          h("a", { href: "breaking.html", class: "note" }, "كل الأخبار العاجلة ←")),
+        h("section", { class: "panel" }, h("h2", {}, h("span", { class: "chip breaking" }, L("عاجل", "Breaking")), L("عالمياً الآن", "worldwide now")), breakingPanel,
+          h("a", { href: geoName ? `breaking.html?${region ? "region=" + region : "country=" + country}` : "breaking.html", class: "note" }, L("كل الأخبار العاجلة العالمية ←", "All global breaking news →"))),
         q ? null : weatherPanel(),
-        h("section", { class: "panel" }, h("h2", {}, "حالة المصادر"), statusPanel,
-          h("p", { class: "note" }, "يجلب الخادم الأخبار تلقائياً كل دقيقة، ولكل مصدر فترة جلب تحترم شروطه. ", h("a", { href: "sources.html" }, "المنهجية"))))));
+        h("section", { class: "panel" }, h("h2", {}, L("حالة المصادر", "Source status")), statusPanel,
+          h("p", { class: "note" }, L("يجلب الخادم الأخبار تلقائياً كل دقيقة، ولكل مصدر فترة جلب تحترم شروطه. ", "News is fetched automatically every minute; each source has its own polite polling interval. "), h("a", { href: "sources.html" }, L("المنهجية", "Methodology")))))));
 }
 
 function renderRows(rows, { prepend = false, isNew = false } = {}) {
@@ -102,8 +112,8 @@ function renderRows(rows, { prepend = false, isNew = false } = {}) {
 
 function emptyState() {
   feedEl.replaceChildren(h("li", { class: "state" },
-    h("h3", {}, q ? "لا نتائج مطابقة" : "لا توجد أخبار بعد"),
-    q ? "جرّب كلمات أقل أو أكثر عمومية." : "ستظهر الأخبار هنا تلقائياً فور جلبها من المصادر."));
+    h("h3", {}, q ? L("لا نتائج مطابقة", "No matching results") : L("لا توجد أخبار بعد", "No news yet")),
+    q ? L("جرّب كلمات أقل أو أكثر عمومية.", "Try fewer or more general words.") : L("ستظهر الأخبار هنا تلقائياً فور جلبها من المصادر.", "News will appear here automatically as soon as it is fetched.")));
 }
 
 async function loadInitial() {
@@ -113,7 +123,7 @@ async function loadInitial() {
   if (q) {
     const { data, error } = await sb.rpc("news_search_articles", { p_q: q, p_category: cat, p_limit: 50, p_before: null });
     if (error) throw error;
-    rows = data;
+    rows = data.filter(inLang);
   } else if (state.sort === "top") {
     const since = new Date(Date.now() - 24 * 3600_000).toISOString();
     const { data, error } = await baseQuery().gt("published_at", since).order("published_at", { ascending: false }).limit(200);
@@ -132,15 +142,14 @@ async function loadInitial() {
   for (const r of rows) state.maxId = Math.max(state.maxId, r.id);
   state.oldest = rows.length ? rows[rows.length - 1].published_at : null;
   loadMore_.hidden = !!q || state.sort === "top" || rows.length < PAGE;
-  metaEl.textContent = q ? `${rows.length} نتيجة` : "";
+  metaEl.textContent = q ? L(`${rows.length} نتيجة`, `${rows.length} results`) : "";
 }
 
 async function loadLead() {
   if (q) return;
   const since = new Date(Date.now() - 12 * 3600_000).toISOString();
-  let lq = sb.from("news_articles").select("id,source_id,title,summary,category,published_at,cluster_id,verification,is_breaking,breaking_until,importance,pinned,image_url")
-    .eq("status", "published").is("duplicate_of", null).gt("published_at", since);
-  if (cat) lq = lq.contains("categories", [cat]);
+  const lq = scope(sb.from("news_articles").select("id,source_id,title,title_en,language,translated,summary,category,countries,published_at,cluster_id,verification,is_breaking,breaking_until,importance,pinned,image_url")
+    .eq("status", "published").is("duplicate_of", null).gt("published_at", since));
   const { data, error } = await lq.order("importance", { ascending: false }).order("published_at", { ascending: false }).limit(60);
   if (error || !data?.length) { leadSlot.replaceChildren(); return; }
   await loadClusterSizes(data);
@@ -155,14 +164,15 @@ async function loadLead() {
   }
   leadSlot.replaceChildren(leadBlock(top, state.sources, state.clusterSize) || "");
   state.leadIds = new Set(top.map((a) => a.id));
-  if (!cat) loadSections();
+  if (!cat && !region && !country) loadSections();
 }
 
-const SECTION_ORDER = ["jordan", "palestine", "arab", "world", "economy", "weather", "sports", "tech", "health", "security", "environment", "education", "entertainment"];
+// World first: Jordan, Palestine and the Arab world are sections like any other, never pinned to the top.
+const SECTION_ORDER = ["world", "politics", "economy", "tech", "health", "environment", "arab", "palestine", "jordan", "sports", "security", "weather", "education", "entertainment"];
 async function loadSections() {
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
-  const { data, error } = await sb.from("news_articles").select("id,source_id,title,summary,category,published_at,image_url,importance")
-    .eq("status", "published").is("duplicate_of", null).gt("published_at", since)
+  const { data, error } = await langFilter(sb.from("news_articles").select("id,source_id,title,title_en,language,translated,summary,category,published_at,image_url,importance")
+    .eq("status", "published").is("duplicate_of", null).gt("published_at", since))
     .order("published_at", { ascending: false }).limit(250);
   if (error || !data?.length) { sectionsSlot.replaceChildren(); return; }
   const lead = state.leadIds || new Set();
@@ -196,20 +206,20 @@ async function loadMore() {
 
 async function loadSide() {
   const now = new Date().toISOString();
-  const [{ data: br }, status] = await Promise.all([
-    sb.from("news_articles").select("id,title,published_at").eq("status", "published").eq("is_breaking", true).is("duplicate_of", null)
-      .gt("breaking_until", now).order("published_at", { ascending: false }).limit(6),
+  void now;
+  const [events, status] = await Promise.all([
+    fetchGlobalEvents({ breakingOnly: true, region, country, limit: 6 }).catch(() => []),
     fetchStatus().catch(() => null),
   ]);
-  breakingPanel.replaceChildren(...(br?.length ? br.map((a) => h("li", {}, h("a", { href: `article.html?id=${a.id}` }, a.title), h("span", { class: "t num" }, ago(a.published_at))))
-    : [h("li", { class: "note" }, "لا أخبار عاجلة حالياً.")]));
+  breakingPanel.replaceChildren(...(events.length ? events.map(eventRow)
+    : [h("li", { class: "note" }, L("لا أخبار عاجلة حالياً.", "No breaking news right now."))]));
   const srcs = [...state.sources.values()].filter((s) => s.enabled);
   statusPanel.replaceChildren(
     ...srcs.slice(0, 14).map((s) => {
       const stale = !s.last_success_at || Date.now() - new Date(s.last_success_at).getTime() > 3600_000;
-      return h("div", {}, h("span", { class: "dot" + (stale ? " stale" : "") }), s.name_ar, h("span", { class: "when num" }, s.last_success_at ? ago(s.last_success_at) : "لم يُجلب بعد"));
+      return h("div", {}, h("span", { class: "dot" + (stale ? " stale" : "") }), EN ? s.name_en || s.name_ar : s.name_ar, h("span", { class: "when num" }, s.last_success_at ? ago(s.last_success_at) : L("لم يُجلب بعد", "not fetched yet")));
     }),
-    status ? h("div", { class: "note", style: "margin-top:6px" }, `${status.sources_healthy} من ${status.sources_active} مصادر تعمل الآن · ${status.articles_24h} خبراً خلال 24 ساعة`) : "");
+    status ? h("div", { class: "note", style: "margin-top:6px" }, L(`${status.sources_healthy} من ${status.sources_active} مصادر تعمل الآن · ${status.articles_24h} خبراً خلال 24 ساعة`, `${status.sources_healthy} of ${status.sources_active} sources working · ${status.articles_24h} stories in 24 h`)) : "");
   return status;
 }
 
@@ -217,7 +227,7 @@ async function loadSide() {
 function updateBanner() {
   const n = state.queue.length;
   banner.hidden = n === 0;
-  bannerBtn.textContent = n === 1 ? "خبر جديد واحد — اعرضه" : `${n} أخبار جديدة — اعرضها`;
+  bannerBtn.textContent = EN ? (n === 1 ? "1 new story — show" : `${n} new stories — show`) : n === 1 ? "خبر جديد واحد — اعرضه" : `${n} أخبار جديدة — اعرضها`;
   document.title = (document.hidden && state.unseen ? `(${state.unseen}) ` : "") + document.title.replace(/^\(\d+\) /, "");
 }
 
@@ -255,7 +265,7 @@ async function tick() {
 async function onChanged(id) {
   const { data } = await sb.from("news_articles").select(ARTICLE_COLS).eq("id", id).maybeSingle();
   const li = feedEl.querySelector(`li[data-id="${id}"]`);
-  if (!data || data.status !== "published") { li?.remove(); state.shown.delete(id); }
+  if (!data || data.status !== "published" || !inLang(data)) { li?.remove(); state.shown.delete(id); }
   else if (li) {
     const fresh = card(data, state.sources.get(data.source_id), { clusterSize: state.clusterSize.get(data.cluster_id) || 1 });
     fresh.dataset.json = JSON.stringify(data); fresh.dataset.src = data.source_id;
@@ -272,7 +282,7 @@ pauseBtn.addEventListener("click", () => {
   const p = !live.paused;
   live.setPaused(p);
   pauseBtn.setAttribute("aria-pressed", String(p));
-  pauseBtn.replaceChildren(p ? ICONS.play() : ICONS.pause(), p ? "استئناف التحديث" : "إيقاف التحديث");
+  pauseBtn.replaceChildren(p ? ICONS.play() : ICONS.pause(), p ? L("استئناف التحديث", "Resume updates") : L("إيقاف التحديث", "Pause updates"));
   if (!p) flushQueue();
 });
 sortSeg.addEventListener("click", (e) => {
@@ -287,7 +297,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) { st
 function showError(e) {
   console.error(e);
   feedEl.replaceChildren(h("li", { class: "state" }, h("div", { class: "error-box" }, friendlyError(e), " ",
-    h("button", { class: "btn", type: "button", onclick: () => boot() }, "إعادة المحاولة"))));
+    h("button", { class: "btn", type: "button", onclick: () => boot() }, L("إعادة المحاولة", "Try again")))));
 }
 
 async function boot() {

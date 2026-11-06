@@ -21,6 +21,7 @@ export class Live {
   start() {
     this.channel = sb.channel("news-feed", { config: { broadcast: { self: false } } })
       .on("broadcast", { event: "new_articles" }, () => this.kick())
+      .on("broadcast", { event: "global_events" }, () => this.kick()) // the worldwide ranking was recomputed
       .on("broadcast", { event: "article_changed" }, ({ payload }) => payload?.id && this.onChanged?.(payload.id))
       .subscribe((status) => {
         this.rt = status === "SUBSCRIBED" ? "live" : (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") ? "down" : this.rt;

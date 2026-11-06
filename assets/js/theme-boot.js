@@ -8,3 +8,9 @@ try {
   if (p.motion === "reduce") r.dataset.motion = "reduce";
   if (p.density === "compact") r.dataset.density = "compact";
 } catch (e) {}
+// Site language: Arabic (RTL) by default, English (LTR) when chosen. Set before first paint.
+try {
+  var q = /[?&]lang=(en|ar)\b/.exec(location.search), l = q ? q[1] : localStorage.getItem("nabd-lang");
+  if (q) localStorage.setItem("nabd-lang", q[1]);
+  if (l === "en") { document.documentElement.lang = "en"; document.documentElement.dir = "ltr"; }
+} catch (e) {}

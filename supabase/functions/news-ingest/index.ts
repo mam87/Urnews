@@ -2,7 +2,7 @@
 // Invoked every minute by pg_cron (see migrations/..._scheduler.sql). Protected by a
 // shared secret stored in Supabase Vault; overlapping calls are rejected by a DB lease.
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import { Db, runIngest, Settings, SimilarRow, SourceRow } from "./lib/pipeline.ts";
+import { Db, RankRow, runIngest, Settings, SignatureRow, SimilarRow, SourceRow } from "./lib/pipeline.ts";
 import { aiConfigFromEnv } from "./lib/ai.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -38,6 +38,10 @@ function supabaseDb(sb: SupabaseClient): Db {
     aiRefund: (n) => rpc<void>("news_ai_refund", { p_n: n }),
     aiBackoff: (m) => rpc<void>("news_ai_backoff", { p_minutes: m }),
     backfillImages: (rows) => rpc<number>("news_backfill_articles", { p_rows: rows }),
+    recentSignatures: (hours) => rpc<SignatureRow[]>("news_recent_signatures", { p_hours: hours }),
+    rankInput: (hours) => rpc<RankRow[]>("news_rank_input", { p_hours: hours }),
+    saveRanking: (events) => rpc<number>("news_save_global_events", { p: events }),
+    setTranslations: (rows) => rpc<number>("news_set_translations", { p: rows }),
     finishRun: (id, stats) => rpc<void>("news_finish_ingest_run", { p_run: id, p: stats }),
   };
 }

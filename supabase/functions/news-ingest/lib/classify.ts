@@ -106,8 +106,7 @@ export function classify(title: string, description: string, feedCategories: str
   if (isBreakingKeyword) importance += 35;
   if (highImpact) importance += 15;
   if (src.kind === "official") importance += 10;
-  if (cats.has("jordan")) importance += 10;
-  if (cats.has("palestine")) importance += 5;
+  // No country bonus: Jordan, Palestine and every other country are ranked on the same terms.
 
   return { category: primary, categories: [...cats], verification, isBreakingKeyword, highImpact, importance };
 }

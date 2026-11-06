@@ -5,6 +5,9 @@ import { detectLanguage, jaccard, titleTokens, truncate } from "./text.ts";
 import { Category, classify, cleanHeadline, SourceInfo } from "./classify.ts";
 import { backoffMinutes, isTransientStatus, retryAfterSeconds, robotsAllows } from "./robots.ts";
 import { AIConfig, aiProcess, AIRateLimited, aiTranslateBatch, digitsIn } from "./ai.ts";
+import { articleCountries, regionOf } from "./geo.ts";
+import { crossLanguageSame, EventSignals, eventSignals, EventType, wireOf } from "./events.ts";
+import { MIN_BREAKING_IMPACT, RankedEvent, rankEvents, Report } from "./rank.ts";
 
 export const USER_AGENT = "LahzaNewsBot/1.0 (+https://github.com/; RSS reader; respects robots.txt)";
 
@@ -14,11 +17,22 @@ export interface SourceRow {
   tz_offset_minutes: number; tz_force_minutes?: number | null; poll_interval_minutes: number; max_items: number; allow_images: boolean;
   allow_excerpt: boolean; consecutive_failures: number; etag: string | null; last_modified: string | null;
   robots_checked_at: string | null; robots_allowed: boolean | null;
+  country?: string | null; publisher?: string | null; national?: boolean;
 }
 
 export interface Settings {
   max_sources_per_run: number; max_item_age_hours: number; auto_publish: boolean; breaking_hours: number;
   ai_summarize: boolean;
+}
+
+/** A recent stored report with a real event type, for Arabic↔English event matching. */
+export interface SignatureRow { article_id: number; cluster_id: number | null; source_id: number; language: string; countries: string[]; event_type: string; title: string; published_at: string }
+
+/** A stored report, as the ranking reads it. */
+export interface RankRow {
+  id: number; cluster_id: number | null; source_id: number; publisher: string; reliability: number; official: boolean;
+  published_at: string; language: string; title: string; title_en: string | null; summary: string | null; countries: string[];
+  event_type: string | null; impact: number; wire: string | null; verification: string; title_tokens: string[];
 }
 
 export interface SimilarRow { idx: number; article_id: number; cluster_id: number | null; source_id: number; sim: number; title_tokens: string[]; language: string }
@@ -35,6 +49,10 @@ export interface Db {
   aiRefund?(n: number): Promise<void>;
   aiBackoff?(minutes: number): Promise<void>;
   backfillImages?(rows: { url_hash: string; image_url: string | null; summary: string | null }[]): Promise<number>;
+  recentSignatures?(hours: number): Promise<SignatureRow[]>;
+  rankInput?(hours: number): Promise<RankRow[]>;
+  saveRanking?(events: Record<string, unknown>[]): Promise<number>;
+  setTranslations?(rows: { id: number; title: string; summary: string | null; title_tokens: string[] }[]): Promise<number>;
   finishRun(runId: number, stats: Record<string, unknown>): Promise<void>;
 }
 
@@ -63,6 +81,10 @@ interface Candidate {
   publishedAt: Date;
   estimated: boolean;
   cls: ReturnType<typeof classify>;
+  countries: string[];
+  signals: EventSignals;
+  wire: string | null;
+  titleEn: string | null;
   matchId?: number;
   dupOf?: number;
   groupKey?: string;
@@ -213,12 +235,15 @@ async function buildCandidates(deps: Deps, src: SourceRow, items: FeedItem[], st
     const desc = bestExcerpt(item);
     const lang = detectLanguage(title) === "ar" ? "ar" : (src.language || detectLanguage(title));
     const cls = classify(item.title, desc, item.categories, sourceInfo(src));
+    const countries = articleCountries(title, desc, src.national ? src.country : null);
     out.push({
       source: src, item, url: safe, hash: await sha256Hex(url), title, titleOriginal: null,
       summary: src.allow_excerpt && desc ? desc : null,
       summaryKind: src.allow_excerpt && desc ? "feed" : "none",
       language: lang, translated: false, tokens: titleTokens(title), digits: digitsIn(title),
       publishedAt: pub, estimated, cls,
+      countries, signals: eventSignals(title, desc, countries), wire: wireOf(title, desc),
+      titleEn: lang === "en" ? title : null,
     });
   }
   return out;
@@ -285,7 +310,8 @@ export async function runIngest(deps: Deps) {
   const log = deps.log ?? (() => {});
   const runId = await deps.db.beginRun();
   if (runId === null) return { skipped: true, status: "skipped", items_new: 0, reason: "another run is active or ingestion is disabled" };
-  const stats = { status: "ok", sources_attempted: 0, sources_ok: 0, sources_failed: 0, items_seen: 0, items_new: 0, ai_calls: 0, error: null as string | null };
+  const stats: Record<string, unknown> & { status: string; sources_attempted: number; sources_ok: number; sources_failed: number; items_seen: number; items_new: number; ai_calls: number; error: string | null } =
+    { status: "ok", sources_attempted: 0, sources_ok: 0, sources_failed: 0, items_seen: 0, items_new: 0, ai_calls: 0, error: null };
   try {
     const st = await deps.db.settings();
     const sources = await deps.db.claimSources(runId, st.max_sources_per_run);
@@ -359,8 +385,10 @@ export async function runIngest(deps: Deps) {
     if (deps.ai.provider !== "none" && fresh.length) {
       const maxAge = TRANSLATE_MAX_AGE_HOURS * 3600_000;
       const needTranslate = fresh.filter((c) => c.language !== "ar" && now.getTime() - c.publishedAt.getTime() < maxAge);
-      // Flash/breaking feeds (shortest poll interval) first, then newest.
-      needTranslate.sort((a, b) => (a.source.poll_interval_minutes - b.source.poll_interval_minutes) || (b.publishedAt.getTime() - a.publishedAt.getTime()));
+      // Biggest world events first (whatever the country), then flash feeds, then newest. Hebrew items have no
+      // other way to be published, so they come before English items of the same impact.
+      needTranslate.sort((a, b) => (b.signals.impact - a.signals.impact) || ((a.language === "en" ? 1 : 0) - (b.language === "en" ? 1 : 0)) ||
+        (a.source.poll_interval_minutes - b.source.poll_interval_minutes) || (b.publishedAt.getTime() - a.publishedAt.getTime()));
       const batches: Candidate[][] = [];
       for (let k = 0; k < needTranslate.length && batches.length < AI_MAX_PER_RUN; k += AI_BATCH_SIZE) batches.push(needTranslate.slice(k, k + AI_BATCH_SIZE));
       const needSummary = st.ai_summarize
@@ -415,30 +443,37 @@ export async function runIngest(deps: Deps) {
       // Items still untranslated but fresh enough: make sure they are seen again on the next poll even if the
       // feed is unchanged (a 304 would otherwise hide them until the publisher updates the feed).
       for (const c of needTranslate) {
-        if (c.translated) continue;
+        if (c.translated || c.language === "en") continue; // English is published as-is (English edition)
         const ps = perSource.get(c.source.id);
         if (ps) { ps.rec.etag = null; ps.rec.last_modified = null; }
       }
     }
 
-    // Foreign-language items are shown only in Arabic: items without a translation (no AI key, per-run or
-    // daily cap reached, rejected output) are skipped now and retried on a later run while still in the feed.
-    fresh = fresh.filter((c) => c.language === "ar" || c.translated);
+    // English items are published in English (the English edition, and translated later if they rank high).
+    // Other languages (Hebrew…) are shown only as Arabic translations: untranslated ones are skipped now and
+    // retried on a later run while still in the feed.
+    fresh = fresh.filter((c) => c.language === "ar" || c.language === "en" || c.translated);
 
     // Near-duplicates and event clustering
     if (fresh.length) {
       const similar = await deps.db.similar(fresh.map((c) => c.title));
       fresh = dedupe(fresh, similar).filter((c) => !c.drop);
+      // Same event reported in another language (an Arabic and an English report of one earthquake).
+      const recent = deps.db.recentSignatures ? await deps.db.recentSignatures(3).catch((e) => { log("signatures failed", (e as Error).message); return []; }) : [];
+      crossLanguageGroup(fresh, recent);
     }
 
     const breakingMs = st.breaking_hours * 3600_000;
     const rows = fresh.map((c) => {
       const recentEnough = now.getTime() - c.publishedAt.getTime() < 3 * 3600_000;
       const ageMin = (now.getTime() - c.publishedAt.getTime()) / 60_000;
-      // Breaking = the publisher says so ("عاجل"), or a fresh high-impact local (Jordan) event.
-      // Corroborated multi-source events are promoted later in SQL. Allegations are never auto-breaking.
-      const localUrgent = c.cls.highImpact && c.cls.categories.includes("jordan") && ageMin < 60 && c.cls.verification !== "allegation";
-      const breaking = (c.cls.isBreakingKeyword && recentEnough || localUrgent) && !c.dupOf && !c.estimated;
+      // Immediate flag, before the global ranking runs at the end of this run (which is what normally decides):
+      // a credible outlet's own "عاجل/Breaking" label on a non-routine story, or a fresh major event from a credible
+      // outlet — in ANY country. Not every "عاجل" headline is breaking. Allegations never are.
+      const credible = c.source.reliability >= 4 || c.source.kind === "official";
+      const urgent = c.signals.impact >= 20 && credible && ageMin < 60;
+      const flagged = c.cls.isBreakingKeyword && recentEnough && credible && c.signals.impact >= MIN_BREAKING_IMPACT;
+      const breaking = (flagged || urgent) && c.cls.verification !== "allegation" && !c.dupOf && !c.estimated;
       return {
         source_id: c.source.id,
         guid: (c.item.guid || c.url).slice(0, 1000),
@@ -446,6 +481,7 @@ export async function runIngest(deps: Deps) {
         url_hash: c.hash,
         title: c.title,
         title_original: c.titleOriginal,
+        title_en: c.titleEn,
         summary: c.summary,
         summary_kind: c.summary ? c.summaryKind : "none",
         language: c.translated ? "ar" : c.language,
@@ -463,7 +499,13 @@ export async function runIngest(deps: Deps) {
         verification: c.cls.verification,
         is_breaking: breaking,
         breaking_until: breaking ? new Date(c.publishedAt.getTime() + breakingMs).toISOString() : null,
-        importance: Math.min(100, c.cls.importance),
+        // Same formula for every country: credibility + global impact (+ the publisher's own urgency label).
+        importance: Math.min(100, Math.round(c.source.reliability * 8 + c.signals.impact * 2 + (c.cls.isBreakingKeyword ? 10 : 0) + (c.source.kind === "official" ? 5 : 0))),
+        countries: c.countries,
+        region: regionOf(c.countries[0]),
+        event_type: c.signals.eventType,
+        impact: c.signals.impact,
+        wire: c.wire,
         status: st.auto_publish ? "published" : "pending",
       };
     });
@@ -477,6 +519,16 @@ export async function runIngest(deps: Deps) {
       rec.items_new = Math.min(newBySource.get(sid) ?? 0, inserted);
       await deps.db.recordFetch(rec);
     }
+    // Global ranking of the last 12 hours: every run with new reports, and every 5 minutes for freshness decay.
+    if (deps.db.rankInput && deps.db.saveRanking && (inserted > 0 || now.getUTCMinutes() % 5 === 0)) {
+      try {
+        const { ranked, rows } = await rankAndSave(deps, now);
+        Object.assign(stats, { events_ranked: ranked.length, events_breaking: ranked.filter((e) => e.breaking).length });
+        await translateTopEvents(deps, ranked, rows, log, stats);
+      } catch (e) {
+        log("ranking failed", (e as Error).message);
+      }
+    }
     if (stats.sources_failed > 0) stats.status = stats.sources_ok > 0 ? "partial" : (sources.length ? "error" : "ok");
   } catch (e) {
     stats.status = "error";
@@ -486,4 +538,92 @@ export async function runIngest(deps: Deps) {
     await deps.db.finishRun(runId, stats).catch((e) => log("finishRun failed", e));
   }
   return { runId, ...stats };
+}
+
+/** Group Arabic↔English (or differently worded) reports of one event that title matching missed. */
+export function crossLanguageGroup(cands: Candidate[], recent: SignatureRow[]) {
+  const sigOf = (c: Candidate) => ({ language: c.language, countries: c.countries, eventType: c.signals.eventType, digits: digitsIn(c.titleOriginal ?? c.title), publishedAt: c.publishedAt.getTime() });
+  for (const c of cands) {
+    if (c.dupOf || c.matchId || c.drop) continue;
+    const mine = sigOf(c);
+    const hit = recent.find((r) => r.source_id !== c.source.id && crossLanguageSame(mine, {
+      language: r.language, countries: r.countries || [], eventType: r.event_type as EventType, digits: digitsIn(r.title || ""), publishedAt: Date.parse(r.published_at),
+    }));
+    if (hit) c.matchId = hit.article_id;
+  }
+  // Within this batch: join ungrouped reports to each other.
+  for (let i = 0; i < cands.length; i++) {
+    const a = cands[i];
+    if (a.dupOf || a.drop) continue;
+    for (let j = i + 1; j < cands.length; j++) {
+      const b = cands[j];
+      if (b.dupOf || b.drop || a.source.id === b.source.id) continue;
+      if ((a.groupKey && a.groupKey === b.groupKey) || (a.matchId && a.matchId === b.matchId)) continue;
+      if (!crossLanguageSame(sigOf(a), sigOf(b))) continue;
+      const key = a.groupKey ?? b.groupKey ?? `x${i}`;
+      for (const c of [a, b]) if (!c.groupKey) c.groupKey = key;
+      const size = cands.filter((c) => c.groupKey === key).length;
+      for (const c of cands) if (c.groupKey === key) c.groupSize = size;
+      const m = a.matchId ?? b.matchId;
+      if (m) for (const c of cands) if (c.groupKey === key && !c.matchId) c.matchId = m;
+    }
+  }
+}
+
+/** Reports stored before 2026-11-06 have no tags yet: derive them from the headline. */
+export function toReport(r: RankRow): Report {
+  let { countries, event_type: type, impact } = r;
+  if (!type) {
+    const text = r.title_en || r.title;
+    countries = articleCountries(text, r.summary || "");
+    const sig = eventSignals(text, r.summary || "", countries);
+    type = sig.eventType; impact = sig.impact;
+  }
+  return {
+    id: r.id, clusterId: r.cluster_id, sourceId: r.source_id, publisher: r.publisher, reliability: r.reliability,
+    official: r.official, publishedAt: Date.parse(r.published_at), language: r.language,
+    hasArabic: r.language === "ar", hasEnglish: !!r.title_en, countries: countries || [], eventType: type as EventType,
+    impact: impact ?? 0, wire: r.wire ?? wireOf(r.title_en || r.title, r.summary || ""), verification: r.verification,
+    tokens: r.title_tokens || [],
+  };
+}
+
+export function eventRow(e: RankedEvent, rank: number): Record<string, unknown> {
+  return {
+    key: e.key, rank, cluster_id: e.clusterId, lead_article_id: e.leadId, lead_ar_id: e.leadArId, lead_en_id: e.leadEnId,
+    first_article_id: e.firstId, score: e.score, parts: e.parts, status: e.status, confirmed: e.confirmed,
+    single_source: e.singleSource, allegation: e.allegation, independent_count: e.independentCount,
+    publisher_count: e.publisherCount, report_count: e.reportCount, countries: e.countries, region: e.region,
+    event_type: e.eventType, first_seen: new Date(e.firstSeen).toISOString(), last_seen: new Date(e.lastSeen).toISOString(),
+    is_breaking: e.breaking,
+  };
+}
+
+async function rankAndSave(deps: Deps, now: Date): Promise<{ ranked: RankedEvent[]; rows: RankRow[] }> {
+  const rows = await deps.db.rankInput!(12);
+  const ranked = rankEvents(rows.map(toReport), now.getTime(), 60);
+  await deps.db.saveRanking!(ranked.map((e, i) => eventRow(e, i + 1)));
+  return { ranked, rows };
+}
+
+/** Breaking or top-ranked events reported only in English get an Arabic headline (one AI request at most). */
+async function translateTopEvents(deps: Deps, ranked: RankedEvent[], rankRows: RankRow[], log: (...a: unknown[]) => void, stats: { ai_calls: number }) {
+  if (deps.ai.provider === "none" || !deps.db.setTranslations) return;
+  const want = ranked.filter((e) => !e.leadArId && e.leadEnId && (e.breaking || e.score >= 55)).slice(0, AI_BATCH_SIZE);
+  if (!want.length) return;
+  const granted = await deps.db.aiTake(1);
+  if (!granted) return;
+  try {
+    const rows = new Map(rankRows.map((r) => [r.id, r]));
+    const items = want.map((e) => rows.get(e.leadEnId!)).filter((r): r is RankRow => !!r);
+    if (!items.length) { await deps.db.aiRefund?.(1); return; }
+    stats.ai_calls++;
+    const res = await aiTranslateBatch(deps.ai, items.map((r) => ({ title: r.title_en || r.title, description: "", lang: "en", sourceName: r.publisher })));
+    const out = items.map((r, k) => (res[k] ? { id: r.id, title: res[k]!.title, summary: null, title_tokens: titleTokens(res[k]!.title) } : null))
+      .filter((x): x is { id: number; title: string; summary: null; title_tokens: string[] } => !!x);
+    if (out.length) await deps.db.setTranslations(out);
+  } catch (e) {
+    log("late translation failed", (e as Error).message);
+    if (e instanceof AIRateLimited && deps.db.aiBackoff) await deps.db.aiBackoff(AI_BACKOFF_MINUTES).catch(() => {});
+  }
 }

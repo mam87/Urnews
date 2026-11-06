@@ -92,12 +92,12 @@ Deno.test("pipeline: ingest, cluster same event across outlets, flag breaking, t
   const db = new FakeDb();
   db.sources = [src(1, "alpha"), src(2, "beta")];
   const feedA = rss([
-    { t: "عاجل | زلزال بقوة 5 درجات يضرب جنوب الأردن", l: "https://alpha.example/n/1?utm_source=rss", d: "أفاد مركز رصد الزلازل بوقوع هزة." },
+    { t: "عاجل | زلزال بقوة 6.4 درجات يضرب جنوب الأردن", l: "https://alpha.example/n/1?utm_source=rss", d: "أفاد مركز رصد الزلازل بوقوع هزة." },
     { t: "افتتاح معرض عمّان الدولي للكتاب", l: "https://alpha.example/n/2" },
     { t: "خبر قديم جداً", l: "https://alpha.example/n/3", date: "Mon, 12 Oct 2026 08:00:00 GMT" },
   ]);
   const feedB = rss([
-    { t: "هزة أرضية بقوة 5 درجات تضرب جنوب الأردن", l: "https://beta.example/x/9" },
+    { t: "هزة أرضية بقوة 6.4 درجات تضرب جنوب الأردن", l: "https://beta.example/x/9" },
     { t: "ارتفاع أسعار الذهب في السوق المحلية", l: "https://beta.example/x/10" },
   ]);
   const { f } = mockFetch({
@@ -109,7 +109,7 @@ Deno.test("pipeline: ingest, cluster same event across outlets, flag breaking, t
   assertEquals(db.articles.length, 4); // old item skipped
   const quakeA = db.articles.find((a) => (a.url as string).includes("alpha.example/n/1"))!;
   const quakeB = db.articles.find((a) => (a.url as string).includes("beta.example/x/9"))!;
-  assertEquals(quakeA.title, "زلزال بقوة 5 درجات يضرب جنوب الأردن"); // "عاجل" marker removed from display title
+  assertEquals(quakeA.title, "زلزال بقوة 6.4 درجات يضرب جنوب الأردن"); // "عاجل" marker removed from display title
   assertEquals(quakeA.is_breaking, true);
   assertEquals(quakeA.verification, "developing");
   assert(quakeA.group_key && quakeA.group_key === quakeB.group_key, "same event should be grouped");
@@ -325,18 +325,87 @@ Deno.test("pipeline: existing article gets a longer excerpt later", async () => 
   assert(String(db.articles[0].summary).startsWith("نص أطول"), "longer excerpt applied");
 });
 
-Deno.test("pipeline: fresh high-impact Jordan event is breaking; old one or allegation is not", async () => {
+Deno.test("pipeline: a fresh major event is breaking in ANY country; old, alleged or routine ones are not", async () => {
   const db = new FakeDb();
   db.sources = [src(1, "alpha", { default_category: "jordan" })];
   const iso = (m: number) => new Date(NOW.getTime() - m * 60000).toUTCString();
   const { f } = mockFetch({ "https://alpha.example/rss": () => new Response(rss([
-    { t: "حريق في مصنع بمدينة الزرقاء الأردنية", l: "https://alpha.example/a", date: iso(10) },
-    { t: "حريق في مستودع بإربد الأردنية قبل ساعات", l: "https://alpha.example/b", date: iso(120) },
+    { t: "انفجار يقتل 12 شخصا في مصنع بمدينة الزرقاء الأردنية", l: "https://alpha.example/a", date: iso(10) },
+    { t: "انفجار يقتل 12 شخصا في مصنع بمدينة ساو باولو البرازيلية", l: "https://alpha.example/a2", date: iso(10) },
+    { t: "انفجار يقتل 12 شخصا في مستودع بإربد الأردنية قبل ساعات", l: "https://alpha.example/b", date: iso(120) },
     { t: "أنباء عن انفجار في العقبة الأردنية", l: "https://alpha.example/c", date: iso(5) },
+    { t: "عاجل | حريق محدود في مصنع بمدينة الزرقاء الأردنية", l: "https://alpha.example/d", date: iso(5) },
   ])) });
   await runIngest({ fetch: f, db, ai: noAI, now: () => NOW, sleep });
   const by = (u: string) => db.articles.find((a) => String(a.url).endsWith(u))!;
   assertEquals(by("/a").is_breaking, true);
+  assertEquals(by("/a2").is_breaking, true, "the same event in Brazil is treated exactly like in Jordan");
+  assertEquals(by("/a").importance, by("/a2").importance);
+  assertEquals(by("/a").countries, ["JO"]);
+  assertEquals(by("/a2").countries, ["BR"]);
   assertEquals(by("/b").is_breaking, false);
   assertEquals(by("/c").is_breaking, false);
+  assertEquals(by("/d").is_breaking, false, "a publisher's «عاجل» label on a minor story is not enough");
+});
+
+/* ---------- 2026-11-06: global edition ---------- */
+class GlobalDb extends FakeDb {
+  saved: Record<string, unknown>[] = [];
+  async recentSignatures() {
+    return this.articles.filter((a) => !a.dup_of && a.event_type && !["general", "routine", "government"].includes(a.event_type as string))
+      .map((a) => ({ article_id: a.id as number, cluster_id: (a.cluster_id as number) ?? null, source_id: a.source_id as number, language: a.language as string,
+        countries: a.countries as string[], event_type: a.event_type as string, title: (a.title_en as string) ?? (a.title as string), published_at: a.published_at as string }));
+  }
+  async rankInput() {
+    return this.articles.filter((a) => !a.dup_of).map((a) => ({
+      id: a.id as number, cluster_id: (a.match_id as number) ?? (a.group_key ? Number(String(a.group_key).replace(/\D/g, "")) + 1000 : null),
+      source_id: a.source_id as number, publisher: `p${a.source_id}`, reliability: 4, official: false, published_at: a.published_at as string,
+      language: a.language as string, title: a.title as string, title_en: (a.title_en as string) ?? null, summary: null,
+      countries: a.countries as string[], event_type: a.event_type as string, impact: a.impact as number, wire: (a.wire as string) ?? null,
+      verification: a.verification as string, title_tokens: a.title_tokens as string[],
+    }));
+  }
+  async saveRanking(events: Record<string, unknown>[]) { this.saved = events; return events.length; }
+}
+
+Deno.test("pipeline: English reports are kept in English, tagged with country/region/event, and ranked globally", async () => {
+  const db = new GlobalDb();
+  db.sources = [src(1, "bbc", { language: "en", reliability: 5 }), src(2, "jo", { country: "JO", national: true, reliability: 3 })];
+  const iso = (m: number) => new Date(NOW.getTime() - m * 60000).toUTCString();
+  const { f } = mockFetch({
+    "https://bbc.example/rss": () => new Response(rss([{ t: "Magnitude 7.4 earthquake strikes northern Japan", l: "https://bbc.example/q", date: iso(8) }])),
+    "https://jo.example/rss": () => new Response(rss([
+      { t: "زلزال بقوة 7.4 درجات يضرب شمال اليابان", l: "https://jo.example/q", date: iso(5) },
+      { t: "البلدية تعلن إغلاق طريق للصيانة", l: "https://jo.example/r", date: iso(2) },
+    ])),
+  });
+  const r = await runIngest({ fetch: f, db, ai: noAI, now: () => NOW, sleep });
+  const en = db.articles.find((a) => a.url === "https://bbc.example/q")!;
+  assertEquals(en.language, "en");
+  assertEquals(en.title_en, "Magnitude 7.4 earthquake strikes northern Japan");
+  assertEquals(en.countries, ["JP"]);
+  assertEquals(en.region, "east_asia");
+  assertEquals(en.event_type, "earthquake");
+  const ar = db.articles.find((a) => a.url === "https://jo.example/q")!;
+  assert(ar.group_key && ar.group_key === en.group_key, "Arabic and English reports of the quake are one event");
+  const road = db.articles.find((a) => a.url === "https://jo.example/r")!;
+  assertEquals(road.countries, ["JO"], "national outlet: an untagged local story is about its own country");
+  assertEquals(road.is_breaking, false);
+  assert((r as Record<string, unknown>).events_ranked as number >= 2);
+  assertEquals(db.saved[0].countries, ["JP"], "the quake ranks first, above the fresher local story");
+  assertEquals(db.saved[0].is_breaking, true);
+  assert(!db.saved.find((e) => (e.countries as string[])[0] === "JO")!.is_breaking);
+});
+
+Deno.test("pipeline: an English report joins an earlier Arabic report of the same event (cross-language match)", async () => {
+  const db = new GlobalDb();
+  db.sources = [src(2, "aj", { reliability: 4 })];
+  const iso = (m: number) => new Date(NOW.getTime() - m * 60000).toUTCString();
+  const { f } = mockFetch({ "https://aj.example/rss": () => new Response(rss([{ t: "انقلاب عسكري في الغابون والجيش يعلن السيطرة على السلطة", l: "https://aj.example/1", date: iso(20) }])) });
+  await runIngest({ fetch: f, db, ai: noAI, now: () => NOW, sleep });
+  db.sources = [src(3, "dw", { language: "en", reliability: 4 })];
+  const { f: f2 } = mockFetch({ "https://dw.example/rss": () => new Response(rss([{ t: "Gabon army officers announce coup, seize power", l: "https://dw.example/1", date: iso(10) }])) });
+  await runIngest({ fetch: f2, db, ai: noAI, now: () => NOW, sleep });
+  const en = db.articles.find((a) => a.url === "https://dw.example/1")!;
+  assertEquals(en.match_id, 1, "matched to the Arabic report");
 });

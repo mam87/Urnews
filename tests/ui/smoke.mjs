@@ -34,7 +34,7 @@ const sources = [
 ];
 const art = (id, extra) => ({
   id, source_id: 1, url: `https://a.example/${id}`, title: `عنوان اختباري رقم ${id}`, title_original: null, summary: "مقتطف قصير من الخبر لأغراض الاختبار فقط.", summary_kind: "feed",
-  language: "ar", translated: false, category: "jordan", categories: ["jordan"], image_url: null, published_at: iso(id * 7), published_estimated: false,
+  language: "ar", translated: false, title_en: null, countries: ["JO"], region: "middle_east", category: "jordan", categories: ["jordan"], image_url: null, published_at: iso(id * 7), published_estimated: false,
   fetched_at: iso(id * 7 - 1), cluster_id: null, verification: "reported", is_breaking: false, breaking_until: null, importance: 30, pinned: false,
   edited: false, status: "published", created_at: iso(id * 7), ...extra,
 });
@@ -45,8 +45,22 @@ let articles = [
   art(4, { title: "OpenAI تطلق نموذجاً جديداً", category: "tech", categories: ["tech"] }),
   art(14, { source_id: 2, title: "خبر بصورة من مصدر يسمح بالصور", image_url: "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=" }),
   art(15, { source_id: 1, title: "خبر بصورة من مصدر لا يسمح بالصور", image_url: "https://img.example/x.jpg" }),
-  art(5, { title: "Jordan opens solar plant", language: "en" }),
+  art(5, { title: "Jordan opens solar plant", title_en: "Jordan opens solar plant", language: "en", countries: ["JO"], region: "middle_east" }),
+  art(16, { title: "زلزال بقوة 7.4 درجات يضرب شمال اليابان", title_en: "Magnitude 7.4 earthquake strikes northern Japan", title_original: "Magnitude 7.4 earthquake strikes northern Japan",
+    translated: true, category: "world", categories: ["world"], countries: ["JP"], region: "east_asia", is_breaking: true, breaking_until: iso(-120), importance: 95 }),
+  art(17, { source_id: 2, title: "Magnitude 7.4 earthquake strikes northern Japan", title_en: "Magnitude 7.4 earthquake strikes northern Japan", language: "en",
+    category: "world", categories: ["world"], countries: ["JP"], region: "east_asia", url: "https://b.example/17" }),
   ...Array.from({ length: 8 }, (_, i) => art(6 + i)),
+];
+const gev = (key, rank, lead, extra) => ({ key, rank, cluster_id: null, lead_article_id: lead, lead_ar_id: null, lead_en_id: null, first_article_id: lead,
+  score: 50, parts: { impact: 10, freshness: 20, credibility: 16, independence: 4, velocity: 0 }, status: "developing", confirmed: false, single_source: true,
+  allegation: false, independent_count: 1, publisher_count: 1, report_count: 1, countries: [], region: null, event_type: "general",
+  first_seen: iso(20), last_seen: iso(20), is_breaking: false, updated_at: iso(1), ...extra });
+const globalEvents = [
+  gev("c77", 1, 16, { lead_ar_id: 16, lead_en_id: 17, first_article_id: 17, score: 93, status: "confirmed", confirmed: true, single_source: false,
+    independent_count: 4, publisher_count: 6, report_count: 7, countries: ["JP"], region: "east_asia", event_type: "earthquake", is_breaking: true,
+    parts: { impact: 27, freshness: 23.3, credibility: 20, independence: 13, velocity: 10 } }),
+  gev("a6", 2, 6, { lead_ar_id: 6, score: 54, countries: ["JO"], region: "middle_east", event_type: "routine" }),
 ];
 let failArticles = false;
 let emptyMode = false;
@@ -63,14 +77,29 @@ async function mock(page) {
       { id: 2, name_ar: "قناة برابط", youtube_channel_id: null, youtube_handle: "@example", official_live_url: null }]);
     if (u.pathname === "/rest/v1/news_clusters") return json([{ id: 9, source_count: 2 }]);
     if (u.pathname === "/rest/v1/rpc/news_site_status") return json({ last_run_at: iso(1), sources_active: 2, sources_healthy: 1, articles_24h: articles.length, interval_minutes: 2 });
+    if (u.pathname === "/rest/v1/news_global_events") {
+      const p = u.searchParams;
+      let rows = [...globalEvents];
+      if (p.get("is_breaking") === "eq.true") rows = rows.filter((e) => e.is_breaking);
+      if (p.get("region")) rows = rows.filter((e) => e.region === p.get("region").slice(3));
+      if (p.get("countries")) rows = rows.filter((e) => e.countries.includes(p.get("countries").replace(/^cs\.\{|\}$/g, "")));
+      return json(rows);
+    }
+    if (u.pathname === "/rest/v1/rpc/news_country_counts") return json([{ country: "JP", region: "east_asia", n: 2 }, { country: "JO", region: "middle_east", n: 14 }]);
     if (u.pathname === "/rest/v1/rpc/news_search_articles") return json(articles.filter((a) => a.title.includes("زلزال")));
     if (u.pathname === "/rest/v1/news_articles") {
       if (failArticles) return json({ message: "boom" }, 500);
       let rows = emptyMode ? [] : [...articles];
       const p = u.searchParams;
       if (p.get("is_breaking") === "eq.true") rows = rows.filter((a) => a.is_breaking);
+      if (p.get("language") === "eq.ar") rows = rows.filter((a) => a.language === "ar");
+      if (p.get("title_en") === "not.is.null") rows = rows.filter((a) => a.title_en);
+      if (p.get("region")) rows = rows.filter((a) => a.region === p.get("region").slice(3));
+      if (p.get("countries")) rows = rows.filter((a) => (a.countries || []).includes(p.get("countries").replace(/^cs\.\{|\}$/g, "")));
+      if (p.get("id")?.startsWith("in.")) rows = rows.filter((a) => p.get("id").slice(4, -1).split(",").map(Number).includes(a.id));
       const gtId = p.get("id")?.startsWith("gt.") ? Number(p.get("id").slice(3)) : null;
       if (gtId !== null) rows = rows.filter((a) => a.id > gtId).sort((a, b) => a.id - b.id);
+      else if (p.get("id")?.startsWith("in.")) { /* filtered above */ }
       else if (p.get("id")?.startsWith("eq.")) rows = rows.filter((a) => a.id === Number(p.get("id").slice(3)));
       else rows.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
       if (p.get("cluster_id")) rows = rows.filter((a) => a.cluster_id === Number(p.get("cluster_id").slice(3)) && a.id !== Number((p.get("id") || "neq.0").slice(4)));
@@ -102,7 +131,10 @@ for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["desktop", {
   await page.waitForSelector(".ticker-move a", { timeout: 5000 }).catch(() => {});
   check((await page.locator(".ticker-move a").count()) >= 2, `${name}: breaking ticker populated (duplicated for loop)`);
   check(await page.locator(".chip.v-allegation").count() > 0, `${name}: allegation label rendered`);
-  check(await page.locator('h3[dir="ltr"]').count() > 0, `${name}: untranslated English headline is LTR + labelled`);
+  check((await page.locator("li.card", { hasText: "Jordan opens solar plant" }).count()) === 0, `${name}: Arabic edition hides untranslated English reports`);
+  check((await page.locator("li.card", { hasText: "اليابان" }).locator(".place-chip").textContent())?.includes("اليابان"), `${name}: card shows country`);
+  check((await page.locator(".catnav a[data-cat]").first().getAttribute("data-cat")) === "world", `${name}: sections start with World (no Jordan-first order)`);
+  check((await page.locator("aside .panel .mini-list li").first().textContent())?.includes("اليابان"), `${name}: side panel lists the top global breaking event`);
   const noHScroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
   check(noHScroll, `${name}: no horizontal scroll`);
   await page.waitForTimeout(1500);
@@ -175,11 +207,55 @@ for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["desktop", {
   await page.waitForSelector(".state h3");
   check((await page.locator(".state h3").textContent()).includes("غير متوفر"), `${name}: missing article state`);
 
-  // breaking page
+  // global breaking page
   await page.goto(base + "/breaking.html");
   await page.waitForSelector(".timeline h3");
-  check(await page.locator(".timeline h3").count() === 1, `${name}: breaking timeline`);
-  await page.screenshot({ path: `${outDir}/breaking-${name}.png` });
+  await page.waitForSelector(".gev");
+  check(await page.locator(".timeline h3").count() === 2, `${name}: breaking timeline (one per breaking report)`);
+  const g1 = page.locator(".gev").first();
+  check((await g1.locator("h3").textContent()).includes("اليابان"), `${name}: global breaking card headline (Arabic edition)`);
+  check((await g1.locator(".score b").textContent()) === "93", `${name}: importance score shown`);
+  check((await g1.locator(".score").getAttribute("title")).includes("الأثر العالمي: 27/30"), `${name}: score breakdown in tooltip`);
+  check((await g1.locator(".place").textContent()).includes("اليابان") && (await g1.locator(".place").textContent()).includes("شرق آسيا"), `${name}: country and region shown`);
+  check((await g1.locator(".chip.st-confirmed").count()) === 1 && (await g1.locator(".chip.breaking").count()) === 1, `${name}: confirmed + breaking status`);
+  check((await g1.locator('a[target="_blank"]').getAttribute("href")) === "https://b.example/17", `${name}: links to the original (first) publisher`);
+  check((await g1.textContent()).includes("4 جهات نشر مستقلة") && (await g1.textContent()).includes("6 وسيلة"), `${name}: independent publisher count (wire copies counted once)`);
+  check(await page.locator(".gev", { hasText: "عنوان اختباري رقم 6" }).count() === 1, `${name}: routine story ranked below, not breaking`);
+  check(await page.locator(".gev.is-breaking").count() === 1, `${name}: only the breaking event is marked breaking`);
+  check(await page.locator(".filters .pill").count() === 12, `${name}: whole-world + 11 region filters`);
+  check(await page.locator(".filters select option").count() === 3, `${name}: country filter lists countries with news`);
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${name}: global page has no horizontal scroll`);
+  await page.screenshot({ path: `${outDir}/breaking-${name}.png`, fullPage: true });
+  await page.goto(base + "/breaking.html?region=europe");
+  await page.waitForSelector(".gev-list li");
+  check(await page.locator(".gev").count() === 0 && (await page.locator(".section-head h2").first().textContent()).includes("أوروبا"), `${name}: region filter (Europe has no events in the mock)`);
+  await page.goto(base + "/index.html?country=JP");
+  await page.waitForSelector("li.card");
+  check((await page.locator("li.card").count()) === 1 && (await page.locator(".section-head h2").first().textContent()).includes("اليابان"), `${name}: country filter on the news feed`);
+
+  // English edition
+  await page.goto(base + "/breaking.html");
+  await page.waitForSelector(".gev");
+  await page.locator(".lang-btn").click();
+  await page.waitForSelector(".gev");
+  check(await page.evaluate(() => document.documentElement.dir === "ltr" && document.documentElement.lang === "en"), `${name}: English edition is LTR`);
+  check((await page.locator(".gev h3").first().textContent()).includes("Magnitude 7.4 earthquake strikes northern Japan"), `${name}: English headline of the same event`);
+  check((await page.locator(".gev .place").first().textContent()).includes("Japan") && (await page.locator(".gev .place").first().textContent()).includes("East Asia"), `${name}: English country/region names`);
+  check((await page.locator(".gev").first().textContent()).includes("4 independent publishers"), `${name}: English publisher count`);
+  check((await page.locator(".catnav").textContent()).includes("Global breaking"), `${name}: English navigation`);
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${name}: English page has no horizontal scroll`);
+  await page.screenshot({ path: `${outDir}/breaking-en-${name}.png`, fullPage: true });
+  await page.goto(base + "/index.html");
+  await page.waitForSelector("li.card");
+  check((await page.locator("li.card", { hasText: "Jordan opens solar plant" }).count()) === 1, `${name}: English edition shows English reports`);
+  check((await page.locator("li.card", { hasText: "عنوان اختباري" }).count()) === 0, `${name}: English edition hides Arabic-only reports`);
+  await page.screenshot({ path: `${outDir}/home-en-${name}.png` });
+  await page.goto(base + "/article.html?id=16");
+  await page.waitForSelector("h1");
+  check((await page.locator("h1").textContent()) === "Magnitude 7.4 earthquake strikes northern Japan", `${name}: English article headline`);
+  await page.locator(".lang-btn").click();
+  await page.waitForSelector("h1");
+  check(await page.evaluate(() => document.documentElement.dir === "rtl") && (await page.locator("h1").textContent()).includes("اليابان"), `${name}: switch back to Arabic`);
 
   // search
   await page.goto(base + "/index.html?q=" + encodeURIComponent("زلزال"));

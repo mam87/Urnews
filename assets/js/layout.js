@@ -1,6 +1,7 @@
 // Shared page chrome: date strip, masthead, breaking ticker, category navigation, footer,
 // reader settings, mobile bottom bar and back-to-top.
 import { sb, h, CATEGORIES, time, ago, initTheme, setupSearchToggle, configured, todayLabel, getPrefs, setPrefs, FONT_STEPS } from "./common.js";
+import { EN, L, setLang, langFilter, titleOf, titleDir } from "./i18n.js";
 
 const svg = (path, vb = "0 0 24 24") => {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -23,6 +24,7 @@ export const ICONS = {
   bolt: () => svg('<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>'),
   tv: () => svg('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="m8 2 4 4 4-4"/>'),
   up: () => svg('<path d="m6 14 6-6 6 6"/>'),
+  globe: () => svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
 };
 
 function settingsDialog() {
@@ -43,20 +45,22 @@ function settingsDialog() {
     return h("label", { class: "switch" }, h("span", {}, label), input);
   };
   const d = h("dialog", { class: "settings", "aria-labelledby": "set-title" },
-    h("h3", { id: "set-title" }, "إعدادات القراءة"),
-    h("p", { class: "note", style: "margin:0 0 6px" }, "تُحفظ على هذا الجهاز فقط."),
-    h("div", { class: "opt" }, h("span", { class: "lbl" }, "حجم الخط"),
-      seg("حجم الخط", FONT_STEPS, p.fs, (v) => setPrefs({ fs: v })),
-      h("div", { class: "preview" }, "مثال: هذا هو حجم النص الذي ستقرأ به الأخبار والعناوين في الموقع.")),
-    h("div", { class: "opt" }, h("span", { class: "lbl" }, "المظهر"),
-      seg("المظهر", [["auto", "تلقائي"], ["light", "فاتح"], ["dark", "داكن"]], p.theme, (v) => setPrefs({ theme: v }))),
-    h("div", { class: "opt" }, h("span", { class: "lbl" }, "طريقة العرض"),
-      seg("طريقة العرض", [["comfy", "مريحة مع المقتطفات"], ["compact", "مختصرة (عناوين فقط)"]], p.density, (v) => setPrefs({ density: v }))),
-    h("div", { class: "opt" }, sw("إخفاء الصور (يوفر استهلاك الإنترنت)", p.noimg, (v) => setPrefs({ noimg: v }))),
-    h("div", { class: "opt" }, sw("إيقاف حركة شريط العاجل", p.motion === "reduce", (v) => setPrefs({ motion: v ? "reduce" : "auto" }))),
+    h("h3", { id: "set-title" }, L("إعدادات القراءة", "Reading settings")),
+    h("p", { class: "note", style: "margin:0 0 6px" }, L("تُحفظ على هذا الجهاز فقط.", "Saved on this device only.")),
+    h("div", { class: "opt" }, h("span", { class: "lbl" }, L("حجم الخط", "Text size")),
+      seg(L("حجم الخط", "Text size"), EN ? FONT_STEPS.map(([v], i) => [v, ["Small", "Normal", "Large", "Larger", "Huge"][i]]) : FONT_STEPS, p.fs, (v) => setPrefs({ fs: v })),
+      h("div", { class: "preview" }, L("مثال: هذا هو حجم النص الذي ستقرأ به الأخبار والعناوين في الموقع.", "Example: this is the size you will read headlines and news in."))),
+    h("div", { class: "opt" }, h("span", { class: "lbl" }, L("المظهر", "Appearance")),
+      seg(L("المظهر", "Appearance"), [["auto", L("تلقائي", "Auto")], ["light", L("فاتح", "Light")], ["dark", L("داكن", "Dark")]], p.theme, (v) => setPrefs({ theme: v }))),
+    h("div", { class: "opt" }, h("span", { class: "lbl" }, L("طريقة العرض", "Layout")),
+      seg(L("طريقة العرض", "Layout"), [["comfy", L("مريحة مع المقتطفات", "Comfortable, with excerpts")], ["compact", L("مختصرة (عناوين فقط)", "Compact (headlines only)")]], p.density, (v) => setPrefs({ density: v }))),
+    h("div", { class: "opt" }, h("span", { class: "lbl" }, L("اللغة", "Language")),
+      seg(L("اللغة", "Language"), [["ar", "العربية"], ["en", "English"]], EN ? "en" : "ar", (v) => setLang(v))),
+    h("div", { class: "opt" }, sw(L("إخفاء الصور (يوفر استهلاك الإنترنت)", "Hide images (saves data)"), p.noimg, (v) => setPrefs({ noimg: v }))),
+    h("div", { class: "opt" }, sw(L("إيقاف حركة شريط العاجل", "Stop the breaking-news ticker animation"), p.motion === "reduce", (v) => setPrefs({ motion: v ? "reduce" : "auto" }))),
     h("div", { class: "toolbar", style: "justify-content:space-between;margin:14px 0 0" },
-      h("button", { class: "btn", type: "button", onclick: () => { setPrefs({ theme: "auto", fs: "1", noimg: false, motion: "auto", density: "comfy" }); d.close(); } }, "استعادة الافتراضي"),
-      h("button", { class: "btn btn-primary", type: "button", onclick: () => d.close() }, "تم")));
+      h("button", { class: "btn", type: "button", onclick: () => { setPrefs({ theme: "auto", fs: "1", noimg: false, motion: "auto", density: "comfy" }); d.close(); } }, L("استعادة الافتراضي", "Reset")),
+      h("button", { class: "btn btn-primary", type: "button", onclick: () => d.close() }, L("تم", "Done"))));
   d.addEventListener("close", () => d.remove());
   d.addEventListener("click", (e) => { if (e.target === d) d.close(); });
   document.body.append(d);
@@ -68,44 +72,46 @@ export function renderChrome({ active = "home" } = {}) {
   const q = params.get("q") || "";
   const cat = params.get("cat");
   const livePill = h("span", { class: "live-pill", id: "live-pill", "data-state": "connecting", role: "status", "aria-live": "polite" },
-    h("span", { class: "live-dot" }), h("span", { class: "live-text" }, "جارٍ الاتصال…"));
+    h("span", { class: "live-dot" }), h("span", { class: "live-text" }, L("جارٍ الاتصال…", "Connecting…")));
 
   const searchForm = (cls, id) => h("form", { class: cls, id, action: "index.html", role: "search" },
-    h("label", { class: "sr-only", for: id + "-q" }, "بحث في الأخبار"),
-    h("input", { id: id + "-q", name: "q", type: "search", placeholder: "ابحث في الأخبار…", value: q, maxlength: "100", autocomplete: "off" }),
+    h("label", { class: "sr-only", for: id + "-q" }, L("بحث في الأخبار", "Search news")),
+    h("input", { id: id + "-q", name: "q", type: "search", placeholder: L("ابحث في الأخبار…", "Search the news…"), value: q, maxlength: "100", autocomplete: "off" }),
     cls === "search" ? ICONS.search() : null);
 
   const strip = h("div", { class: "topstrip" },
     h("div", { class: "wrap" },
       h("span", {}, todayLabel()),
       h("span", { class: "sep-dot hide-sm", "aria-hidden": "true" }),
-      h("span", { class: "hide-sm" }, "بتوقيت عمّان"),
+      h("span", { class: "hide-sm" }, L("بتوقيت عمّان", "Amman time")),
       h("span", { class: "push" },
-        h("a", { href: "live.html" }, "البث المباشر"),
-        h("a", { href: "sources.html", class: "hide-sm" }, "المصادر"),
-        h("button", { type: "button", class: "linklike", style: "border:0;background:none;padding:0;cursor:pointer;color:var(--ink-2);font:inherit", onclick: settingsDialog }, "حجم الخط والإعدادات"))));
+        h("a", { href: "live.html" }, L("البث المباشر", "Live TV")),
+        h("a", { href: "sources.html", class: "hide-sm" }, L("المصادر", "Sources")),
+        h("button", { type: "button", class: "linklike", lang: EN ? "ar" : "en", style: "border:0;background:none;padding:0;cursor:pointer;color:var(--ink-2);font:inherit;font-weight:700", onclick: () => setLang(EN ? "ar" : "en") }, EN ? "العربية" : "English"),
+        h("button", { type: "button", class: "linklike", style: "border:0;background:none;padding:0;cursor:pointer;color:var(--ink-2);font:inherit", onclick: settingsDialog }, L("حجم الخط والإعدادات", "Text size & settings")))));
 
   const header = h("header", { class: "masthead" },
     h("div", { class: "wrap bar" },
-      h("a", { class: "brand", href: "index.html", "aria-label": "لحظة — الصفحة الرئيسية" },
-        h("span", { class: "mark" }, ICONS.pulse()), "لحظة", h("small", {}, "الخبر لحظة بلحظة")),
+      h("a", { class: "brand", href: "index.html", "aria-label": L("لحظة — الصفحة الرئيسية", "Lahza — home") },
+        h("span", { class: "mark" }, ICONS.pulse()), L("لحظة", "Lahza"), h("small", {}, L("الخبر لحظة بلحظة", "World news, minute by minute"))),
       h("div", { class: "mast-tools" },
         livePill,
         searchForm("search", "s1"),
-        h("button", { class: "icon-btn search-toggle", id: "search-toggle", type: "button", "aria-label": "بحث" }, ICONS.search()),
-        h("button", { class: "icon-btn", id: "theme-toggle", type: "button", "aria-label": "تبديل الوضع الليلي" }, ICONS.theme()),
-        h("button", { class: "icon-btn", id: "settings-btn", type: "button", "aria-label": "إعدادات القراءة وحجم الخط", onclick: settingsDialog }, ICONS.gear()))),
+        h("button", { class: "icon-btn search-toggle", id: "search-toggle", type: "button", "aria-label": L("بحث", "Search") }, ICONS.search()),
+        h("button", { class: "icon-btn lang-btn", type: "button", lang: EN ? "ar" : "en", "aria-label": L("Switch to English", "التبديل إلى العربية"), title: L("English", "العربية"), onclick: () => setLang(EN ? "ar" : "en") }, EN ? "ع" : "EN"),
+        h("button", { class: "icon-btn", id: "theme-toggle", type: "button", "aria-label": L("تبديل الوضع الليلي", "Toggle dark mode") }, ICONS.theme()),
+        h("button", { class: "icon-btn", id: "settings-btn", type: "button", "aria-label": L("إعدادات القراءة وحجم الخط", "Reading settings"), onclick: settingsDialog }, ICONS.gear()))),
     h("div", { class: "wrap" }, h("div", { class: "search-mobile", id: "search-mobile" }, searchForm("", "s2"))));
 
-  const tickerTrack = h("div", { class: "ticker-track", id: "ticker-track" }, h("div", { class: "ticker-empty" }, "جارٍ تحميل الأخبار العاجلة…"));
-  const ticker = h("section", { class: "ticker", "aria-label": "شريط الأخبار العاجلة" },
-    h("div", { class: "wrap" }, h("a", { class: "ticker-label", href: "breaking.html" }, "عاجل"), tickerTrack));
+  const tickerTrack = h("div", { class: "ticker-track", id: "ticker-track" }, h("div", { class: "ticker-empty" }, L("جارٍ تحميل الأخبار العاجلة…", "Loading breaking news…")));
+  const ticker = h("section", { class: "ticker", "aria-label": L("شريط الأخبار العاجلة", "Breaking news ticker") },
+    h("div", { class: "wrap" }, h("a", { class: "ticker-label", href: "breaking.html" }, L("عاجل", "Breaking")), tickerTrack));
 
-  const nav = h("nav", { class: "catnav", "aria-label": "الأقسام" },
+  const nav = h("nav", { class: "catnav", "aria-label": L("الأقسام", "Sections") },
     h("div", { class: "wrap" },
-      h("a", { href: "index.html", "aria-current": active === "home" && !cat && !q ? "page" : null }, "الرئيسية"),
-      h("a", { href: "breaking.html", class: "breaking-link", "aria-current": active === "breaking" ? "page" : null }, "عاجل"),
-      h("a", { href: "live.html", class: "live-link", "aria-current": active === "live" ? "page" : null }, "بث مباشر"),
+      h("a", { href: "index.html", "aria-current": active === "home" && !cat && !q ? "page" : null }, L("الرئيسية", "Home")),
+      h("a", { href: "breaking.html", class: "breaking-link", "aria-current": active === "breaking" ? "page" : null }, L("عاجل عالمي", "Global breaking")),
+      h("a", { href: "live.html", class: "live-link", "aria-current": active === "live" ? "page" : null }, L("بث مباشر", "Live TV")),
       CATEGORIES.map(([slug, name]) => h("a", { href: `index.html?cat=${slug}`, "aria-current": cat === slug ? "page" : null, dataset: { cat: slug } },
         h("span", { class: "dot", style: `background:var(--c-${slug})`, "aria-hidden": "true" }), name))));
 
@@ -113,27 +119,27 @@ export function renderChrome({ active = "home" } = {}) {
     h("div", { class: "wrap" },
       h("div", { class: "cols" },
         h("div", {},
-          h("div", { class: "brand" }, h("span", { class: "mark" }, ICONS.pulse()), "لحظة"),
-          h("p", { style: "margin:0" }, "يجمع العناوين آلياً على مدار الساعة من الخلاصات الرسمية لمصادر إخبارية موثوقة، ويعرض عنواناً ومقتطفاً مع رابط واضح للخبر الكامل لدى مصدره. حقوق المحتوى محفوظة لأصحابها.")),
-        h("div", {}, h("h4", {}, "الأقسام"),
+          h("div", { class: "brand" }, h("span", { class: "mark" }, ICONS.pulse()), L("لحظة", "Lahza")),
+          h("p", { style: "margin:0" }, L("منصة أخبار عالمية: تجمع العناوين آلياً على مدار الساعة من الخلاصات الرسمية لمصادر موثوقة من كل مناطق العالم، وترتّب الأحداث حسب أهميتها العالمية، وتعرض عنواناً ومقتطفاً مع رابط واضح للخبر الكامل لدى مصدره. حقوق المحتوى محفوظة لأصحابها.", "A global news platform: headlines are collected automatically, around the clock, from the official feeds of trusted publishers in every region, ranked by global importance, and shown as a headline and short excerpt with a clear link to the full story at its source. All content rights belong to their owners."))),
+        h("div", {}, h("h4", {}, L("الأقسام", "Sections")),
           h("ul", {}, CATEGORIES.slice(0, 5).map(([slug, name]) => h("li", {}, h("a", { href: `index.html?cat=${slug}` }, name))))),
-        h("div", {}, h("h4", {}, "الموقع"),
+        h("div", {}, h("h4", {}, L("الموقع", "Site")),
           h("ul", {},
-            h("li", {}, h("a", { href: "breaking.html" }, "الأخبار العاجلة")),
-            h("li", {}, h("a", { href: "live.html" }, "البث المباشر")),
-            h("li", {}, h("a", { href: "sources.html" }, "المصادر ومنهجية العمل")),
-            h("li", {}, h("button", { type: "button", style: "border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit", onclick: settingsDialog }, "إعدادات القراءة")),
-            h("li", {}, h("a", { href: "admin.html" }, "دخول المحررين"))))),
-      h("div", { class: "legal" }, "التصنيفات وعلامات التحقق آلية وقد تخطئ؛ «حسب المصدر» تعني أن الموقع لم يتحقق من الخبر بشكل مستقل. جميع الأوقات بتوقيت عمّان.")));
+            h("li", {}, h("a", { href: "breaking.html" }, L("الأخبار العاجلة العالمية", "Global breaking news"))),
+            h("li", {}, h("a", { href: "live.html" }, L("البث المباشر", "Live TV"))),
+            h("li", {}, h("a", { href: "sources.html" }, L("المصادر ومنهجية العمل", "Sources & methodology"))),
+            h("li", {}, h("button", { type: "button", style: "border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit", onclick: settingsDialog }, L("إعدادات القراءة", "Reading settings"))),
+            h("li", {}, h("a", { href: "admin.html" }, L("دخول المحررين", "Editors")))))),
+      h("div", { class: "legal" }, L("التصنيفات وعلامات التحقق وترتيب الأهمية آلية وقد تخطئ؛ «حسب المصدر» تعني أن الموقع لم يتحقق من الخبر بشكل مستقل. جميع الأوقات بتوقيت عمّان.", "Sections, verification labels and importance scores are automatic and can be wrong; “as reported” means we have not verified the story independently. All times are Amman time (UTC+3)."))));
 
-  const bottombar = h("nav", { class: "bottombar", "aria-label": "تنقل سريع" },
-    h("a", { href: "index.html", "aria-current": active === "home" && !cat && !q ? "page" : null }, ICONS.home(), "الرئيسية"),
-    h("a", { href: "breaking.html", "aria-current": active === "breaking" ? "page" : null }, ICONS.bolt(), "عاجل"),
-    h("a", { href: "live.html", class: "live-ic", "aria-current": active === "live" ? "page" : null }, ICONS.tv(), "بث مباشر"),
-    h("button", { type: "button", onclick: () => { const box = document.getElementById("search-mobile"); box.classList.add("open"); scrollTo({ top: 0 }); box.querySelector("input")?.focus(); } }, ICONS.search(), "بحث"),
-    h("button", { type: "button", onclick: settingsDialog }, ICONS.gear(), "الإعدادات"));
+  const bottombar = h("nav", { class: "bottombar", "aria-label": L("تنقل سريع", "Quick navigation") },
+    h("a", { href: "index.html", "aria-current": active === "home" && !cat && !q ? "page" : null }, ICONS.home(), L("الرئيسية", "Home")),
+    h("a", { href: "breaking.html", "aria-current": active === "breaking" ? "page" : null }, ICONS.bolt(), L("عاجل", "Breaking")),
+    h("a", { href: "live.html", class: "live-ic", "aria-current": active === "live" ? "page" : null }, ICONS.tv(), L("بث مباشر", "Live")),
+    h("button", { type: "button", onclick: () => { const box = document.getElementById("search-mobile"); box.classList.add("open"); scrollTo({ top: 0 }); box.querySelector("input")?.focus(); } }, ICONS.search(), L("بحث", "Search")),
+    h("button", { type: "button", onclick: settingsDialog }, ICONS.gear(), L("الإعدادات", "Settings")));
 
-  const toTop = h("button", { class: "to-top", type: "button", "aria-label": "العودة للأعلى", onclick: () => scrollTo({ top: 0, behavior: "smooth" }) }, ICONS.up());
+  const toTop = h("button", { class: "to-top", type: "button", "aria-label": L("العودة للأعلى", "Back to top"), onclick: () => scrollTo({ top: 0, behavior: "smooth" }) }, ICONS.up());
   addEventListener("scroll", () => toTop.classList.toggle("show", scrollY > 900), { passive: true });
 
   document.body.prepend(strip, header, ticker, nav);
@@ -145,28 +151,32 @@ export function renderChrome({ active = "home" } = {}) {
   const setLiveState = (state, lastUpdated) => {
     if (lastUpdated) lastRun = lastUpdated;
     livePill.dataset.state = state;
-    const label = { live: "مباشر", polling: "تحديث دوري", paused: "متوقف مؤقتاً", offline: "غير متصل", connecting: "جارٍ الاتصال…" }[state] || state;
+    const label = (EN ? { live: "Live", polling: "Auto-refresh", paused: "Paused", offline: "Offline", connecting: "Connecting…" } : { live: "مباشر", polling: "تحديث دوري", paused: "متوقف مؤقتاً", offline: "غير متصل", connecting: "جارٍ الاتصال…" })[state] || state;
     const txt = livePill.querySelector(".live-text");
-    txt.replaceChildren(label, lastRun ? h("span", { class: "lbl-long" }, " · آخر تحديث " + time(lastRun)) : "");
-    livePill.title = lastRun ? `آخر جلب ناجح للأخبار: ${ago(lastRun)}` : "";
+    txt.replaceChildren(label, lastRun ? h("span", { class: "lbl-long" }, L(" · آخر تحديث ", " · updated ") + time(lastRun)) : "");
+    livePill.title = lastRun ? L("آخر جلب ناجح للأخبار: ", "Last successful fetch: ") + ago(lastRun) : "";
   };
 
   async function refreshTicker() {
     if (!configured) return;
-    const { data, error } = await sb.from("news_articles")
-      .select("id,title,published_at")
+    const { data, error } = await langFilter(sb.from("news_articles")
+      .select("id,title,title_en,language,published_at,cluster_id")
       .eq("status", "published").eq("is_breaking", true).is("duplicate_of", null)
-      .gt("breaking_until", new Date().toISOString())
-      .order("published_at", { ascending: false }).limit(12);
-    if (error) { tickerTrack.replaceChildren(h("div", { class: "ticker-empty" }, "تعذّر تحميل العاجل")); return; }
-    if (!data.length) { tickerTrack.replaceChildren(h("div", { class: "ticker-empty" }, "لا أخبار عاجلة في هذه اللحظة")); return; }
+      .gt("breaking_until", new Date().toISOString()))
+      .order("published_at", { ascending: false }).limit(20);
+    if (error) { tickerTrack.replaceChildren(h("div", { class: "ticker-empty" }, L("تعذّر تحميل العاجل", "Could not load breaking news"))); return; }
+    // one headline per event (the oldest report of each event is dropped in favour of the newest)
+    const seenEv = new Set();
+    const rows = data.filter((a) => { const k = a.cluster_id ? "c" + a.cluster_id : "a" + a.id; if (seenEv.has(k)) return false; seenEv.add(k); return true; }).slice(0, 12);
+    data.splice(0, data.length, ...rows);
+    if (!data.length) { tickerTrack.replaceChildren(h("div", { class: "ticker-empty" }, L("لا أخبار عاجلة في هذه اللحظة", "No breaking news right now"))); return; }
     const group = () => h("span", { class: "ticker-group" }, data.map((a, i) => [
       i ? h("span", { class: "sep", "aria-hidden": "true" }) : null,
-      h("a", { href: `article.html?id=${a.id}` }, a.title, h("span", { class: "t-time" }, time(a.published_at))),
+      h("a", { href: `article.html?id=${a.id}`, dir: titleDir(a) }, titleOf(a), h("span", { class: "t-time" }, time(a.published_at))),
     ]));
     const g2 = group(); g2.setAttribute("aria-hidden", "true"); g2.querySelectorAll("a").forEach((x) => x.setAttribute("tabindex", "-1"));
     const move = h("div", { class: "ticker-move" }, group(), g2);
-    const chars = data.reduce((n, a) => n + a.title.length, 0);
+    const chars = data.reduce((n, a) => n + titleOf(a).length, 0);
     move.style.setProperty("--dur", Math.max(25, Math.round(chars / 5)) + "s"); // ~5 chars/sec, readable
     tickerTrack.replaceChildren(move);
   }

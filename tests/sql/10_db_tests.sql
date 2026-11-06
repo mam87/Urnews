@@ -203,6 +203,47 @@ select pg_temp.fails($$select public.news_admin_stats()$$, 'anon cannot read adm
 select pg_temp.fails($$select * from cron.job$$, 'anon cannot read cron.job');
 reset role;
 
+-- 2026-11-06: global breaking news ---------------------------------------------------------------
+update public.news_sources set publisher = 'grp', language = 'en' where id = 2;
+set role service_role;
+select pg_temp.ok((select count(*) from public.news_insert_articles(jsonb_build_array(
+  jsonb_build_object('source_id', 2, 'guid', 'q1', 'url', 'https://beta.example/q1', 'url_hash', repeat('7', 64),
+    'title', 'Magnitude 7.4 earthquake strikes northern Japan', 'title_en', 'Magnitude 7.4 earthquake strikes northern Japan',
+    'language', 'en', 'category', 'world', 'published_at', now() - interval '5 minutes',
+    'countries', jsonb_build_array('jp', 'XXX'), 'region', 'east_asia', 'event_type', 'earthquake', 'impact', 99, 'wire', 'reuters')
+))) = 1, 'insert_articles accepts global tags');
+select pg_temp.ok((select countries = array['JP'] and region = 'east_asia' and impact = 30 and wire = 'reuters' and title_en is not null
+  from public.news_articles where guid = 'q1'), 'countries normalised to ISO-2, impact clamped to 30');
+select pg_temp.ok((select publisher from public.news_rank_input(12) where title_en like 'Magnitude%') = 'grp', 'rank_input reports the publisher group');
+select pg_temp.ok((select count(*) from public.news_recent_signatures(3) where event_type = 'earthquake') = 1, 'recent_signatures lists event-typed reports');
+select pg_temp.ok(public.news_save_global_events(jsonb_build_array(
+  jsonb_build_object('key', 'a' || (select id from public.news_articles where guid = 'q1'), 'rank', 1,
+    'lead_article_id', (select id from public.news_articles where guid = 'q1'), 'lead_en_id', (select id from public.news_articles where guid = 'q1'),
+    'score', 91, 'parts', jsonb_build_object('impact', 27), 'status', 'developing', 'single_source', true, 'confirmed', false,
+    'allegation', false, 'independent_count', 1, 'publisher_count', 1, 'report_count', 1, 'countries', array['JP'], 'region', 'east_asia',
+    'event_type', 'earthquake', 'first_seen', now() - interval '5 minutes', 'last_seen', now() - interval '5 minutes', 'is_breaking', true),
+  jsonb_build_object('key', 'a999999', 'rank', 2, 'lead_article_id', 999999, 'score', 10, 'status', 'developing',
+    'first_seen', now(), 'last_seen', now(), 'is_breaking', false)
+)) = 1, 'save_global_events stores events and skips ones whose article is gone');
+select pg_temp.ok((select is_breaking and breaking_until > now() from public.news_articles where guid = 'q1'), 'breaking event flags its lead report for the ticker');
+select pg_temp.ok(public.news_set_translations(jsonb_build_array(jsonb_build_object('id', (select id from public.news_articles where guid = 'q1'),
+  'title', 'زلزال بقوة 7.4 درجات يضرب شمال اليابان'))) = 1, 'late translation of an English headline');
+select pg_temp.ok((select language = 'ar' and translated and title_original like 'Magnitude%' and title_en like 'Magnitude%' from public.news_articles where guid = 'q1'), 'translated row keeps its English headline');
+select pg_temp.ok(public.news_set_translations(jsonb_build_array(jsonb_build_object('id', (select id from public.news_articles where guid = 'q1'), 'title', 'مرة ثانية'))) = 0, 'translation is applied once');
+reset role;
+set role anon;
+select pg_temp.ok((select score from public.news_global_events where rank = 1) = 91, 'anon reads the global ranking');
+select pg_temp.ok((select country from public.news_country_counts(48) limit 1) is not null, 'anon reads country counts for the filter');
+select pg_temp.ok((select publisher from public.news_sources where id = 2) = 'grp', 'anon reads source publisher group');
+select pg_temp.fails($$delete from public.news_global_events$$, 'anon cannot change the ranking');
+select pg_temp.fails($$select public.news_save_global_events('[]')$$, 'anon cannot save a ranking');
+select pg_temp.fails($$select * from public.news_rank_input(12)$$, 'anon cannot call rank_input');
+select pg_temp.fails($$select public.news_set_translations('[]')$$, 'anon cannot set translations');
+reset role;
+set role authenticated;
+select pg_temp.fails($$insert into public.news_global_events (key, rank, lead_article_id, score, status, first_seen, last_seen) values ('a1', 1, 1, 1, 'developing', now(), now())$$, 'signed-in users cannot write the ranking');
+reset role;
+
 -- retention & time zone
 select pg_temp.ok((public.news_purge_old() ->> 'articles')::int = 1, 'retention deletes old unpinned articles');
 select pg_temp.ok(to_char(timestamptz '2026-10-16 21:30:00+00' at time zone 'Asia/Amman', 'YYYY-MM-DD HH24:MI') = '2026-10-17 00:30', 'Asia/Amman is UTC+3 in the database');

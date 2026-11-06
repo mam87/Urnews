@@ -111,3 +111,12 @@ export function detectLanguage(s: string): "ar" | "he" | "en" | "fr" | "other" {
   if (/[éèêàçùûôî]|\b(le|la|les|des|du|une|est)\b/i.test(s)) return "fr";
   return "en";
 }
+
+/** Regex source matching a normalized term with Arabic attached prefixes: «والصين», «بالصين», and
+ *  «للأردن» (ل + الأردن drops the alef). English/Latin terms get no prefixes. */
+export function termPattern(normTerm: string): string {
+  const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  if (!/[\u0600-\u06ff]/.test(normTerm)) return esc(normTerm);
+  if (normTerm.startsWith("ال") && normTerm.length > 3) return `(?:و|ف|ب|ك)?(?:ال|لل)${esc(normTerm.slice(2))}`;
+  return `(?:و|ف|ب|ل|ك|ال|وال|بال|لل|فال)?${esc(normTerm)}`;
+}
