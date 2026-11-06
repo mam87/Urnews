@@ -52,3 +52,17 @@
   UN News (robots), Al Mamlaka (robots + 404), Petra (robots).
 * **CI:** the `tests` workflow had failed since 2026-10-28 (migration 16 calls pg_cron, absent in CI);
   fixed with a pg_cron stub. `nightly-backup` fails until the `SUPABASE_DB_URL` Actions secret is added.
+
+## Global breaking news (2026-11-06, later the same day)
+* **Edge Function `news-ingest` v12** imports `lib/*.ts` pinned to commit `d2655d944cf30a47bf613b811265f78b4aa3accd`.
+* **Migration applied:** `…21_global_breaking.sql` (fetched from GitHub at that commit, md5 `5c39156acb50fd3bb69ed17d966d4ef5` verified, then executed).
+* **Ranking:** every run with new reports (and every 5 min) ranks the last 12 h into `news_global_events`
+  (score 0–100: impact 30, freshness 25, credibility 20, independent coverage 15, speed 10). No country bonus;
+  the old Jordan-only breaking rule and Jordan/Palestine importance bonuses were removed.
+* **New feeds (21), all fetched OK from this project on 2026-11-06:** USGS M4.5+ quakes (official), Euronews EN,
+  RFI EN, CBS World, CBC World, Mexico News Daily, MercoPress, Agência Brasil EN, Buenos Aires Times, Africanews,
+  Premium Times (NG), CNA, Straits Times, SCMP, Yonhap, Japan Times, The Hindu, Dawn, Times of Central Asia,
+  AKIpress, ABC Australia. Not possible: Reuters/AP/AFP (no public RSS; AP 403), CNN (TLS error / frozen feed),
+  NHK World and Kyodo (404), News24 (403), GDACS (rejected), Rappler (robots.txt blocks AI crawlers).
+* English reports are now published in English (English edition) instead of being dropped when untranslated;
+  the Arabic edition still shows only Arabic and translated reports. Hebrew remains translation-only.

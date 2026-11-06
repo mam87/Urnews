@@ -1,7 +1,7 @@
 // Bilingual (Arabic + English) gazetteer: which countries a headline is about, and their world region.
 // Location is used ONLY for tagging and filtering. It never adds ranking points (see rank.ts): Jordan is
 // treated exactly like every other country.
-import { normalizeArabic, termPattern } from "./text.ts";
+import { normalizeArabic } from "./text.ts";
 
 export type Region =
   | "north_america" | "south_america" | "europe" | "middle_east" | "north_africa" | "sub_saharan_africa"
@@ -228,24 +228,46 @@ export function regionOf(iso: string | null | undefined): Region | null {
   return (iso && COUNTRY_BY_ISO.get(iso)?.region) || null;
 }
 
-// One pattern per term, longest first, so "south sudan" / "guinea-bissau" win over "sudan" / "guinea".
-const PATTERNS = TERMS.filter((p) => p.term.length >= 2).sort((a, b) => b.term.length - a.term.length)
-  .map(({ iso, term, weight }) => ({ iso, weight, re: new RegExp(`(^|\\s)${termPattern(term)}(?=\\s|$)`, "g") }));
+// Dictionary lookup (no regex per term): normalized phrase → country. Phrases of up to MAX_WORDS words are
+// tried longest-first at each word, so "south sudan" / "guinea bissau" win over "sudan" / "guinea".
+const TERM_MAP = new Map<string, { iso: string; weight: number }>();
+for (const t of [...TERMS].sort((a, b) => a.weight - b.weight)) if (t.term.length >= 2) TERM_MAP.set(t.term, { iso: t.iso, weight: t.weight });
+const MAX_WORDS = Math.max(...[...TERM_MAP.keys()].map((k) => k.split(" ").length));
+const AR = /^[\u0600-\u06ff]/;
+const PREFIXES = ["وال", "بال", "كال", "فال", "لل", "ال", "و", "ف", "ب", "ك", "ل"];
+
+/** Forms of an Arabic word without its attached prefix: «والصين» → الصين, «للأردن» → الاردن, «بالعراق» → العراق. */
+function wordForms(w: string): string[] {
+  const out = [w];
+  if (!AR.test(w)) return out;
+  for (const p of PREFIXES) {
+    if (w.length - p.length < 2 || !w.startsWith(p)) continue;
+    const rest = w.slice(p.length);
+    out.push(rest);
+    if (p.endsWith("ال") || p === "لل") out.push("ال" + rest);
+  }
+  return out;
+}
 
 /** Countries mentioned in a text, most-mentioned first (ties: first mention first). */
 export function detectCountries(text: string): string[] {
-  let s = " " + normalizeArabic(text) + " ";
+  const words = normalizeArabic(text).split(" ").filter(Boolean);
   const hits = new Map<string, { n: number; pos: number }>();
-  for (const { iso, re, weight } of PATTERNS) {
-    re.lastIndex = 0;
-    if (!re.test(s)) continue;
-    re.lastIndex = 0;
-    s = s.replace(re, (m: string, lead: string, offset: number) => {
-      const h = hits.get(iso) ?? { n: 0, pos: offset };
-      h.n += weight; h.pos = Math.min(h.pos, offset);
-      hits.set(iso, h);
-      return lead + " ".repeat(m.length - lead.length); // blank it out, keep positions
-    });
+  for (let i = 0; i < words.length;) {
+    let matched = 0;
+    for (let n = Math.min(MAX_WORDS, words.length - i); n >= 1 && !matched; n--) {
+      const tail = n > 1 ? " " + words.slice(i + 1, i + n).join(" ") : "";
+      for (const f of wordForms(words[i])) {
+        const hit = TERM_MAP.get(f + tail);
+        if (!hit) continue;
+        const h = hits.get(hit.iso) ?? { n: 0, pos: i };
+        h.n += hit.weight;
+        hits.set(hit.iso, h);
+        matched = n;
+        break;
+      }
+    }
+    i += matched || 1;
   }
   return [...hits.entries()].sort((a, b) => b[1].n - a[1].n || a[1].pos - b[1].pos).map(([iso]) => iso);
 }
