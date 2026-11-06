@@ -12,7 +12,7 @@
 // independent publishers or ONE highly credible publisher reporting a major event (impact ≥ 24, score ≥ 70),
 // then labelled "single-source report".
 import { regionOf } from "./geo.ts";
-import { EventType } from "./events.ts";
+import { crossLanguageSame, EventType, Signature } from "./events.ts";
 import { jaccard } from "./text.ts";
 
 export interface Report {
@@ -161,6 +161,7 @@ export function rankEvents(reports: Report[], now: number, limit = 60): RankedEv
     const k = r.clusterId ? `c${r.clusterId}` : `a${r.id}`;
     byKey.set(k, [...(byKey.get(k) ?? []), r]);
   }
+  mergeSameEvents(byKey);
   const events = [...byKey.entries()].map(([k, rs]) => scoreEvent(k, rs, now))
     .sort((a, b) => b.score - a.score || b.lastSeen - a.lastSeen);
   let nBreaking = 0;
@@ -169,4 +170,36 @@ export function rankEvents(reports: Report[], now: number, limit = 60): RankedEv
     else e.breaking = false;
   }
   return events.slice(0, limit);
+}
+
+const sigOf = (r: Report): Signature => ({ language: r.language, countries: r.countries, eventType: r.eventType,
+  digits: new Set(r.tokens.filter((t) => /^\d+$/.test(t))), publishedAt: r.publishedAt });
+
+/** Join stored groups that are one event (e.g. a USGS record and a news report of the same quake, stored
+ *  before they could be matched). Same conservative test as at insert time, on each group's first report. */
+export function mergeSameEvents(byKey: Map<string, Report[]>) {
+  const keys = [...byKey.keys()];
+  const first = new Map(keys.map((k) => [k, [...byKey.get(k)!].sort((a, b) => a.publishedAt - b.publishedAt)[0]]));
+  const buckets = new Map<string, string[]>();
+  for (const k of keys) {
+    const r = first.get(k)!;
+    if (["general", "routine", "government"].includes(r.eventType) || !r.countries.length) continue;
+    const b = `${r.eventType}|${r.countries[0]}`;
+    buckets.set(b, [...(buckets.get(b) ?? []), k]);
+  }
+  for (const ks of buckets.values()) {
+    for (let i = 0; i < ks.length; i++) {
+      if (!byKey.has(ks[i])) continue;
+      for (let j = i + 1; j < ks.length; j++) {
+        if (!byKey.has(ks[j])) continue;
+        const a = first.get(ks[i])!, b = first.get(ks[j])!;
+        if (a.publisher === b.publisher || !crossLanguageSame(sigOf(a), sigOf(b))) continue;
+        // keep the cluster key (c…) or the older group's key
+        const [keep, drop] = ks[i].startsWith("c") || !ks[j].startsWith("c") ? [ks[i], ks[j]] : [ks[j], ks[i]];
+        byKey.set(keep, [...byKey.get(keep)!, ...byKey.get(drop)!]);
+        byKey.delete(drop);
+        if (drop === ks[i]) break;
+      }
+    }
+  }
 }

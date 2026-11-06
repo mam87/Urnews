@@ -200,3 +200,17 @@ Deno.test("rank: a single outlet alone cannot raise an alert for a mid-level sto
   const two = scoreEvent("t", [rep(1, "aj", 4, "سوريا.. قصف إسرائيلي يستهدف قرية في ريف القنيطرة", 7), rep(1, "bbc", 5, "Israeli shelling hits village in Syria's Quneitra", 5)], NOW);
   assert(two.breaking, "corroborated by a second independent publisher, it is");
 });
+
+Deno.test("rank: reports of one quake stored separately (USGS + news) are merged into one event", () => {
+  nextId = 1;
+  const ranked = rankEvents([
+    rep(null, "usgs", 5, "M 6.1 - 144 km SE of Hasaki, Japan", 50, { official: true }),
+    rep(null, "thehindu", 4, "Magnitude-6.1 earthquake hits off Tokyo, no tsunami alert: weather agency", 45),
+    rep(null, "japantimes", 4, "Magnitude 6.1 quake hits off Tokyo, but no tsunami alert issued", 30),
+    rep(null, "dw", 4, "Floods in northern Japan force evacuations", 20),
+  ], NOW);
+  const quake = ranked.find((e) => e.eventType === "earthquake")!;
+  assertEquals(quake.reportCount, 3);
+  assertEquals(quake.independentCount, 3);
+  assertEquals(ranked.length, 2, "the flood is a different event");
+});

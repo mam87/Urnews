@@ -226,6 +226,17 @@ select pg_temp.ok(public.news_save_global_events(jsonb_build_array(
     'first_seen', now(), 'last_seen', now(), 'is_breaking', false)
 )) = 1, 'save_global_events stores events and skips ones whose article is gone');
 select pg_temp.ok((select is_breaking and breaking_until > now() from public.news_articles where guid = 'q1'), 'breaking event flags its lead report for the ticker');
+-- reconcile: an automatic flag outside every breaking event is withdrawn; an editor's flag is kept
+select public.news_insert_articles(jsonb_build_array(jsonb_build_object('source_id', 1, 'guid', 'z1', 'url', 'https://alpha.example/z1',
+  'url_hash', repeat('9', 64), 'title', 'عاجل محلي من دون حدث عالمي', 'category', 'jordan', 'published_at', now() - interval '3 minutes',
+  'is_breaking', true, 'breaking_until', now() + interval '3 hours')));
+update public.news_articles set is_breaking = true, breaking_until = now() + interval '2 hours' where guid = 'h3';
+insert into public.news_article_history (article_id, changed_by, action, old_values, new_values)
+  select id, '00000000-0000-0000-0000-00000000000a', 'edit', '{"is_breaking": false}', '{"is_breaking": true}' from public.news_articles where guid = 'h3';
+select public.news_save_global_events((select jsonb_agg(to_jsonb(g) - 'updated_at') from public.news_global_events g));
+select pg_temp.ok((select not is_breaking from public.news_articles where guid = 'z1'), 'automatic breaking flag outside breaking events is withdrawn');
+select pg_temp.ok((select is_breaking from public.news_articles where guid = 'h3'), 'editor-set breaking flag is never withdrawn');
+select pg_temp.ok((select is_breaking from public.news_articles where guid = 'q1'), 'lead of a breaking event stays breaking');
 select pg_temp.ok(public.news_set_translations(jsonb_build_array(jsonb_build_object('id', (select id from public.news_articles where guid = 'q1'),
   'title', 'زلزال بقوة 7.4 درجات يضرب شمال اليابان'))) = 1, 'late translation of an English headline');
 select pg_temp.ok((select language = 'ar' and translated and title_original like 'Magnitude%' and title_en like 'Magnitude%' from public.news_articles where guid = 'q1'), 'translated row keeps its English headline');
