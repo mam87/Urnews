@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 OUT="${1:-dist/functions}"
-for f in news-ingest news-notify; do
+for f in news-ingest news-notify news-stories; do
   mkdir -p "$OUT/$f"
   npx --yes esbuild@0.24.0 "supabase/functions/$f/index.ts" --bundle --format=esm --platform=neutral --target=es2022 \
     --charset=ascii --external:@supabase/supabase-js --external:fast-xml-parser --outfile="$OUT/$f/index.js" --log-level=warning
