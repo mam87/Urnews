@@ -33,6 +33,7 @@ export interface RankRow {
   id: number; cluster_id: number | null; source_id: number; publisher: string; reliability: number; official: boolean;
   published_at: string; language: string; title: string; title_en: string | null; summary: string | null; countries: string[];
   event_type: string | null; impact: number; wire: string | null; verification: string; title_tokens: string[];
+  category?: string | null;
 }
 
 export interface SimilarRow { idx: number; article_id: number; cluster_id: number | null; source_id: number; sim: number; title_tokens: string[]; language: string }
@@ -242,7 +243,7 @@ async function buildCandidates(deps: Deps, src: SourceRow, items: FeedItem[], st
       summaryKind: src.allow_excerpt && desc ? "feed" : "none",
       language: lang, translated: false, tokens: titleTokens(title), digits: digitsIn(title),
       publishedAt: pub, estimated, cls,
-      countries, signals: eventSignals(title, desc, countries), wire: wireOf(title, desc),
+      countries, signals: eventSignals(title, desc, countries, cls.category), wire: wireOf(title, desc),
       titleEn: lang === "en" ? title : null,
     });
   }
@@ -570,15 +571,14 @@ export function crossLanguageGroup(cands: Candidate[], recent: SignatureRow[]) {
   }
 }
 
-/** Reports stored before 2026-11-06 have no tags yet: derive them from the headline. */
+/** Event signals are re-derived from the headline on every run (cheap), so rule fixes apply to stored reports
+ *  at once and reports stored before 2026-11-06 are tagged too. The English original is preferred: the
+ *  keyword lists are bilingual, but a translation can drop words. */
 export function toReport(r: RankRow): Report {
-  let { countries, event_type: type, impact } = r;
-  if (!type) {
-    const text = r.title_en || r.title;
-    countries = articleCountries(text, r.summary || "");
-    const sig = eventSignals(text, r.summary || "", countries);
-    type = sig.eventType; impact = sig.impact;
-  }
+  const text = r.title_en || r.title;
+  const countries = r.countries?.length ? r.countries : articleCountries(text, r.summary || "");
+  const sig = eventSignals(text, r.summary || "", countries, r.category ?? null);
+  const type = sig.eventType, impact = sig.impact;
   return {
     id: r.id, clusterId: r.cluster_id, sourceId: r.source_id, publisher: r.publisher, reliability: r.reliability,
     official: r.official, publishedAt: Date.parse(r.published_at), language: r.language,

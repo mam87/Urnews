@@ -9,7 +9,8 @@
 //   Event development speed     10  independent reports in the last 30 minutes
 //
 // Breaking = score ≥ BREAKING_MIN, a non-routine event, < 6 h old, not only allegations, and either 2+
-// independent publishers or ONE highly credible publisher (then labelled "single-source developing report").
+// independent publishers or ONE highly credible publisher reporting a major event (impact ≥ 24, score ≥ 70),
+// then labelled "single-source report".
 import { regionOf } from "./geo.ts";
 import { EventType } from "./events.ts";
 import { jaccard } from "./text.ts";
@@ -64,6 +65,9 @@ export const MAX_BREAKING = 8;
 export const BREAKING_MAX_AGE_H = 6;
 export const MIN_BREAKING_IMPACT = 14;      // routine/general stories (≤ 12) never become breaking
 export const SINGLE_SOURCE_MIN_RELIABILITY = 4;
+/** One outlet alone can raise an alert only for a major event and a high overall score. */
+export const SINGLE_SOURCE_MIN_IMPACT = 24;
+export const SINGLE_SOURCE_MIN_SCORE = 70;
 const FRESH_HALF_LIFE_MIN = 120;
 const INDEPENDENCE_PTS = [0, 4, 8, 11, 13, 15];
 const VELOCITY_PTS = [0, 3, 6, 8, 10];
@@ -135,7 +139,8 @@ export function scoreEvent(key: string, reports: Report[], now: number): RankedE
 
   const singleSource = independentCount === 1;
   const breakingEligible = score >= BREAKING_MIN && impact >= MIN_BREAKING_IMPACT && !allegation &&
-    ageMin <= BREAKING_MAX_AGE_H * 60 && (!singleSource || maxRel >= SINGLE_SOURCE_MIN_RELIABILITY);
+    ageMin <= BREAKING_MAX_AGE_H * 60 &&
+    (!singleSource || (maxRel >= SINGLE_SOURCE_MIN_RELIABILITY && impact >= SINGLE_SOURCE_MIN_IMPACT && score >= SINGLE_SOURCE_MIN_SCORE));
 
   const r1 = (x: number) => Math.round(x * 10) / 10;
   return {

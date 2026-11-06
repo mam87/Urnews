@@ -171,3 +171,32 @@ Deno.test("rank: freshness decays and an old event drops out of breaking", () =>
   assert(fresh.score > old.score + 20);
   assert(fresh.breaking && !old.breaking);
 });
+
+Deno.test("events: regressions from the first live run (2026-11-06)", () => {
+  const sig = (t: string, ex = "", cat: string | null = null) => eventSignals(t, ex, articleCountries(t, ex), cat);
+  // "no tsunami alert" is an earthquake, not a tsunami
+  const q = sig("Magnitude-6.1 earthquake hits off Tokyo, no tsunami alert: weather agency");
+  assertEquals(q.eventType, "earthquake");
+  assertEquals(q.impact, 20);
+  // USGS titles
+  assertEquals(sig("M 6.1 - 144 km SE of Hasaki, Japan").eventType, "earthquake");
+  // a business conference is not an international decision; excerpt countries do not make it global
+  assert(sig("Family Business Summit day 2 tackles US-China ties, Asean and geopolitical shifts",
+    "Speakers from the United States, China and Russia discussed...").impact < 14);
+  // «قمة» in sport is a big match
+  assert(sig("ألفاريز في الواجهة.. قصة ميركاتو مؤجلة تشعل قمة أتلتيكو وبرشلونة", "", "sports").impact <= 8);
+  // analysis / expert commentary
+  assert(sig("خبراء: هذا السيناريو الأمريكي الأقرب تجاه إيران").impact <= 10);
+  assert(sig("Why the midterm swing won't change the US-China rivalry").impact <= 10);
+  // hard news in a soft section stays hard news
+  assert(sig("Stadium explosion kills 14 during football match in Lagos", "", "sports").impact >= 21);
+});
+
+Deno.test("rank: a single outlet alone cannot raise an alert for a mid-level story", () => {
+  nextId = 1;
+  const mid = scoreEvent("m", [rep(null, "aj", 4, "سوريا.. قصف إسرائيلي يستهدف قرية في ريف القنيطرة", 7)], NOW);
+  assert(!mid.breaking, `single-source shelling report (impact ${mid.parts.impact}, score ${mid.score}) is not an alert`);
+  nextId = 1;
+  const two = scoreEvent("t", [rep(1, "aj", 4, "سوريا.. قصف إسرائيلي يستهدف قرية في ريف القنيطرة", 7), rep(1, "bbc", 5, "Israeli shelling hits village in Syria's Quneitra", 5)], NOW);
+  assert(two.breaking, "corroborated by a second independent publisher, it is");
+});
