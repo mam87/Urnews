@@ -32,6 +32,7 @@ export interface Report {
   wire: string | null;
   verification: string;
   tokens: string[];
+  magnitude?: number | null;  // earthquakes
 }
 
 export type Status = "developing" | "confirmed" | "updated";
@@ -173,7 +174,7 @@ export function rankEvents(reports: Report[], now: number, limit = 60): RankedEv
 }
 
 const sigOf = (r: Report): Signature => ({ language: r.language, countries: r.countries, eventType: r.eventType,
-  digits: new Set(r.tokens.filter((t) => /^\d+$/.test(t))), publishedAt: r.publishedAt });
+  digits: new Set(r.tokens.filter((t) => /^\d+$/.test(t))), publishedAt: r.publishedAt, magnitude: r.magnitude ?? null });
 
 /** Join stored groups that are one event (e.g. a USGS record and a news report of the same quake, stored
  *  before they could be matched). Same conservative test as at insert time, on each group's first report. */

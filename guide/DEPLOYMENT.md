@@ -54,11 +54,16 @@
   fixed with a pg_cron stub. `nightly-backup` fails until the `SUPABASE_DB_URL` Actions secret is added.
 
 ## Global breaking news (2026-11-06, later the same day)
-* **Edge Function `news-ingest` v12** imports `lib/*.ts` pinned to commit `d2655d944cf30a47bf613b811265f78b4aa3accd`.
-* **Migration applied:** `…21_global_breaking.sql` (fetched from GitHub at that commit, md5 `5c39156acb50fd3bb69ed17d966d4ef5` verified, then executed).
+* **Edge Function `news-ingest` v15** imports `lib/*.ts` pinned to commit `eb0b02f124df03dab2d2c0a164154a7a62734c0d`.
+  History: v12 (`d2655d9`) hit the Edge CPU-time limit on its first run (one regex per country term × 300 new items;
+  the run lock released itself after 5 min) → v13 (`3611db1`) dictionary lookup (~0.3 s worst case) → v14 (`fb801bb`)
+  stricter breaking rules from the first live ranking → v15 (`eb0b02f`) breaking reconcile + stored-event merging → v16 quakes merge only when magnitudes agree.
+* **Migrations applied** (each fetched from GitHub at its commit, md5-verified, then executed): `…21_global_breaking.sql`, `…22_rank_input_category.sql`, `…23_breaking_reconcile.sql`.
 * **Ranking:** every run with new reports (and every 5 min) ranks the last 12 h into `news_global_events`
   (score 0–100: impact 30, freshness 25, credibility 20, independent coverage 15, speed 10). No country bonus;
-  the old Jordan-only breaking rule and Jordan/Palestine importance bonuses were removed.
+  the old Jordan-only breaking rule and Jordan/Palestine importance bonuses were removed. The ranking is the
+  single authority for automatic breaking flags (publisher «عاجل» labels are provisional); editor flags are never removed.
+  One outlet alone can raise an alert only for a major event (impact ≥ 24 and score ≥ 70), labelled single-source.
 * **New feeds (21), all fetched OK from this project on 2026-11-06:** USGS M4.5+ quakes (official), Euronews EN,
   RFI EN, CBS World, CBC World, Mexico News Daily, MercoPress, Agência Brasil EN, Buenos Aires Times, Africanews,
   Premium Times (NG), CNA, Straits Times, SCMP, Yonhap, Japan Times, The Hindu, Dawn, Times of Central Asia,

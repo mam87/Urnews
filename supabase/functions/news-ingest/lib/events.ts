@@ -139,7 +139,7 @@ export function wireOf(title: string, excerpt: string): string | null {
 }
 
 /* ---------- cross-language event matching ---------- */
-export interface Signature { language: string; countries: string[]; eventType: EventType; digits: Set<string>; publishedAt: number }
+export interface Signature { language: string; countries: string[]; eventType: EventType; digits: Set<string>; publishedAt: number; magnitude?: number | null }
 
 /** Is a report in one language about the same event as a report in another? Conservative: the type must be
  *  a real event type, both must name the same main country, they must be within 3 hours, numbers must not
@@ -150,6 +150,8 @@ export function crossLanguageSame(a: Signature, b: Signature): boolean {
   const main = (s: Signature) => s.countries.slice(0, 2);
   if (!main(a).some((c) => main(b).includes(c))) return false;
   if (Math.abs(a.publishedAt - b.publishedAt) > 3 * 3600_000) return false;
+  // Two quakes in one country are different events unless their magnitudes agree (aftershocks are separate).
+  if (a.eventType === "earthquake" && a.magnitude != null && b.magnitude != null && Math.abs(a.magnitude - b.magnitude) > 0.3) return false;
   const big = (s: Set<string>) => [...s].filter((d) => d.length >= 2 && !(Number(d) >= 1900 && Number(d) <= 2100));
   const da = big(a.digits), db = big(b.digits);
   const shared = da.some((d) => db.includes(d));

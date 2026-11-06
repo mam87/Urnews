@@ -6,7 +6,7 @@ import { Category, classify, cleanHeadline, SourceInfo } from "./classify.ts";
 import { backoffMinutes, isTransientStatus, retryAfterSeconds, robotsAllows } from "./robots.ts";
 import { AIConfig, aiProcess, AIRateLimited, aiTranslateBatch, digitsIn } from "./ai.ts";
 import { articleCountries, regionOf } from "./geo.ts";
-import { crossLanguageSame, EventSignals, eventSignals, EventType, wireOf } from "./events.ts";
+import { crossLanguageSame, EventSignals, eventSignals, EventType, magnitudeOf, wireOf } from "./events.ts";
 import { MIN_BREAKING_IMPACT, RankedEvent, rankEvents, Report } from "./rank.ts";
 
 export const USER_AGENT = "LahzaNewsBot/1.0 (+https://github.com/; RSS reader; respects robots.txt)";
@@ -543,12 +543,12 @@ export async function runIngest(deps: Deps) {
 
 /** Group Arabic↔English (or differently worded) reports of one event that title matching missed. */
 export function crossLanguageGroup(cands: Candidate[], recent: SignatureRow[]) {
-  const sigOf = (c: Candidate) => ({ language: c.language, countries: c.countries, eventType: c.signals.eventType, digits: digitsIn(c.titleOriginal ?? c.title), publishedAt: c.publishedAt.getTime() });
+  const sigOf = (c: Candidate) => ({ language: c.language, countries: c.countries, eventType: c.signals.eventType, digits: digitsIn(c.titleOriginal ?? c.title), publishedAt: c.publishedAt.getTime(), magnitude: c.signals.magnitude });
   for (const c of cands) {
     if (c.dupOf || c.matchId || c.drop) continue;
     const mine = sigOf(c);
     const hit = recent.find((r) => r.source_id !== c.source.id && crossLanguageSame(mine, {
-      language: r.language, countries: r.countries || [], eventType: r.event_type as EventType, digits: digitsIn(r.title || ""), publishedAt: Date.parse(r.published_at),
+      language: r.language, countries: r.countries || [], eventType: r.event_type as EventType, digits: digitsIn(r.title || ""), publishedAt: Date.parse(r.published_at), magnitude: magnitudeOf(r.title || ""),
     }));
     if (hit) c.matchId = hit.article_id;
   }
@@ -584,7 +584,7 @@ export function toReport(r: RankRow): Report {
     official: r.official, publishedAt: Date.parse(r.published_at), language: r.language,
     hasArabic: r.language === "ar", hasEnglish: !!r.title_en, countries: countries || [], eventType: type as EventType,
     impact: impact ?? 0, wire: r.wire ?? wireOf(r.title_en || r.title, r.summary || ""), verification: r.verification,
-    tokens: r.title_tokens || [],
+    tokens: r.title_tokens || [], magnitude: sig.magnitude,
   };
 }
 

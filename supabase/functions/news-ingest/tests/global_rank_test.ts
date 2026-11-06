@@ -214,3 +214,16 @@ Deno.test("rank: reports of one quake stored separately (USGS + news) are merged
   assertEquals(quake.independentCount, 3);
   assertEquals(ranked.length, 2, "the flood is a different event");
 });
+
+Deno.test("rank: a smaller quake in the same country is a separate event", () => {
+  nextId = 1;
+  const rs = [
+    rep(null, "usgs", 5, "M 6.1 - 144 km SE of Hasaki, Japan", 50, { official: true }),
+    rep(null, "japantimes", 4, "Magnitude 6.1 quake hits off Tokyo, but no tsunami alert issued", 30),
+    rep(null, "usgs", 5, "M 4.6 - 36 km E of Watari, Japan", 10, { official: true }),
+  ].map((r) => ({ ...r, magnitude: magnitudeOf(r.tokens.join(" ")) ?? null }));
+  rs[0].magnitude = 6.1; rs[1].magnitude = 6.1; rs[2].magnitude = 4.6;
+  const ranked = rankEvents(rs, NOW);
+  assertEquals(ranked.length, 2);
+  assertEquals(ranked.find((e) => e.reportCount === 2)?.eventType, "earthquake");
+});
