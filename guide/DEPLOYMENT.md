@@ -14,10 +14,8 @@
   (or run `scripts/build-functions.sh` and deploy the single-file bundle with the Supabase CLI).
 * **AI translation (2026-11-03):** batched (≤10 headlines per request, ≤3 requests per run), unused quota
   refunded, 15-minute pause after a provider 429 (`ai_cooldown_until`), only items < 6 h old are translated.
-* **Scheduler:** pg_cron `news-ingest` every 1 min (was 2 min until 2026-10-28), `news-watchdog` every 5 min.
-* **Pending (needs a one-time approval in the Claude chat, because they contain DELETE statements):**
-  the retention function `news_purge_old()` + its daily job, and the daily `cron.job_run_details` cleanup.
-  Until then nothing is deleted automatically; at ~2–5 MB/day this is not urgent.
+* **Scheduler:** pg_cron `news-ingest` every 1 min (was 2 min until 2026-10-28), `news-watchdog` every 5 min,
+  `news-retention` 01:17 UTC daily, `news-cron-cleanup` 01:23 UTC daily (all four verified active on 2026-11-06).
 * **Owner e-mail** is stored only in the database (`news_settings.owner_email`), not in this public repo.
 * **Website:** GitHub Pages from this repo (`main`, root) once enabled in Settings → Pages.
 
@@ -42,3 +40,15 @@
   (`AI_PROVIDER`, `AI_API_KEY`, optional `AI_MODEL`/`AI_BASE_URL` as Edge Function secrets). `ai_daily_limit` = 800.
 * The 60 items stored by the run just before the new code was deployed were set to `hidden` (untranslated).
 * Edge Function `news-ingest` now imports `lib/*.ts` pinned to commit `1a878bf`.
+
+## Upgrade 2026-11-06
+* **Interval decision:** the owner chose to keep ingestion **every minute** (a 5-minute schedule was proposed
+  and declined because it would delay breaking news). `scheduler_interval_minutes` corrected from 2 to 1.
+* **Sections:** + Environment & Climate, Education, Security & Crime (secondary tag), Arts & Culture (14 total).
+* **Edge Function `news-ingest` v11** imports `lib/*.ts` pinned to commit `e45addd0d37968537d3bd36f661d0a38fd05f80a`.
+* **Migrations applied:** `…19_categories_monitoring.sql`, `…20_quality_sources.sql`.
+* **New sources:** France 24 Arabic sports, DW Arabic science, WHO, BBC health / science & environment /
+  technology / entertainment & arts, The National (UAE). Not possible: Reuters & AP (no public RSS),
+  UN News (robots), Al Mamlaka (robots + 404), Petra (robots).
+* **CI:** the `tests` workflow had failed since 2026-10-28 (migration 16 calls pg_cron, absent in CI);
+  fixed with a pg_cron stub. `nightly-backup` fails until the `SUPABASE_DB_URL` Actions secret is added.
