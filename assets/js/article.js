@@ -3,10 +3,14 @@ import { sb, h, ARTICLE_COLS, CAT_NAME, VERIFICATION, SUMMARY_KIND, configured, 
 import { renderChrome, fetchStatus, ICONS } from "./layout.js";
 import { EN, L, titleOf, titleDir, flag, countryName, isCountry, REGION_NAME } from "./i18n.js";
 import { Live } from "./live.js";
+import { renderStory } from "./story-view.js";
+import { storyForCluster, storyHref } from "./stories.js";
 
 const chrome = renderChrome({ active: "article" });
 const root = document.getElementById("app");
-const id = Number(new URLSearchParams(location.search).get("id"));
+const params = new URLSearchParams(location.search);
+const id = Number(params.get("id"));
+const storyId = Number(params.get("story"));
 
 function notFound() {
   root.replaceChildren(h("div", { class: "state" }, h("h3", {}, L("الخبر غير متوفر", "Story not available")),
@@ -33,6 +37,7 @@ async function render() {
   const { data: moreCat } = await sb.from("news_articles").select("id,title,title_en,language,source_id,published_at,image_url")
     .eq("status", "published").is("duplicate_of", null).eq("category", a.category).neq("id", a.id)
     .order("published_at", { ascending: false }).limit(6);
+  const fullStory = await storyForCluster(a.cluster_id).catch(() => null);
   const breakingNow = a.is_breaking && new Date(a.breaking_until) > new Date();
   const v = VERIFICATION[a.verification] || VERIFICATION.reported;
   const dir = titleDir(a);
@@ -60,6 +65,8 @@ async function render() {
       verificationChip(a.verification),
       !EN && a.translated ? h("span", { class: "chip lang" }, "مترجم آلياً") : null),
     h("h1", { dir }, head),
+    fullStory ? h("a", { class: "full-story-link", href: storyHref(fullStory.id) },
+      h("span", { class: "chip story-chip" }, L("تقرير كامل", "Full report")), h("span", {}, fullStory.title), " ", L("←", "→")) : null,
     !EN && a.translated && a.title_original ? h("p", { class: "note" }, "العنوان الأصلي: ", h("span", { dir: "auto" }, a.title_original)) : null,
     EN && !a.title_en ? h("p", { class: "note" }, "Reported in Arabic; no English version is available.") : null,
     h("div", { class: "byline" },
@@ -111,6 +118,15 @@ async function render() {
 
 async function boot() {
   if (!configured) return notConfiguredState(root);
+  if (Number.isInteger(storyId) && storyId > 0) {
+    try {
+      if (!(await renderStory(root, storyId))) notFound();
+      chrome.refreshTicker();
+    } catch (e) {
+      root.replaceChildren(h("div", { class: "error-box" }, friendlyError(e), " ", h("button", { class: "btn", type: "button", onclick: boot }, L("إعادة المحاولة", "Try again"))));
+    }
+    return;
+  }
   if (!Number.isInteger(id) || id <= 0) return notFound();
   try {
     await render();

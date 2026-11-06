@@ -86,7 +86,7 @@ function extractJson(s: string): unknown {
 const LANG_AR: Record<string, string> = { he: "العبرية", en: "الإنجليزية", fr: "الفرنسية" };
 
 /** One chat request to the configured provider; returns the raw text. Throws AIRateLimited on 401/403/429. */
-async function callModel(cfg: AIConfig, system: string, user: string, maxTokens: number): Promise<string> {
+export async function callModel(cfg: AIConfig, system: string, user: string, maxTokens: number): Promise<string> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), cfg.timeoutMs);
   try {

@@ -62,6 +62,53 @@ const globalEvents = [
     parts: { impact: 27, freshness: 23.3, credibility: 20, independence: 13, velocity: 10 } }),
   gev("a6", 2, 6, { lead_ar_id: 6, score: 54, countries: ["JO"], region: "middle_east", event_type: "routine" }),
 ];
+// Full reports (published only — the mock mirrors Row Level Security for anonymous readers)
+const storyBody = (lang) => lang === "ar" ? {
+  sections: [
+    { key: "event", paras: [
+      { t: "ضرب زلزال بقوة 7.4 درجات شمال اليابان على عمق نحو 40 كيلومتراً بحسب وكالة الأرصاد.", k: "fact", r: [1, 2] },
+      { t: "ودعت السلطات السكان إلى التوجه للمرتفعات تحسباً لأمواج تسونامي.", k: "statement", r: [1] },
+      { t: "وأفادت وسائل إعلام محلية بسقوط قتيلين دون تأكيد رسمي.", k: "developing", r: [3] },
+      { t: "وتتهم جهة محلية السلطات بالتأخر في إصدار التحذير.", k: "allegation", r: [3] }] },
+    { key: "analysis", paras: [{ t: "تبقى الحصيلة غير مؤكدة في الساعات الأولى.", k: "analysis", r: [] }] }],
+  timeline: [{ at: iso(80), t: "تحذير رسمي من تسونامي", r: [1] }, { at: iso(70), t: "أول تقرير عن الزلزال", r: [2] }],
+} : {
+  sections: [{ key: "event", paras: [
+    { t: "A magnitude 7.4 earthquake struck off northern Japan, the weather agency said.", k: "fact", r: [1, 2] },
+    { t: "Local media reported two deaths, which officials have not confirmed.", k: "developing", r: [3] }] }],
+  timeline: [{ at: iso(80), t: "Tsunami warning issued", r: [1] }],
+};
+const story = (id, extra) => ({ id, event_id: "e1", language: "ar", cluster_id: 9, category: "world", countries: ["JP"], region: "east_asia",
+  title: "زلزال قوي قبالة شمال اليابان يدفع لتحذير من تسونامي", dek: "ضرب زلزال بقوة 7.4 درجات قبالة شمال اليابان، وحذرت السلطات من أمواج تسونامي على الساحل.",
+  body: storyBody("ar"), word_count: 420, hero_image_url: null, hero_image_credit: null, hero_source_id: null, byline: "editorial", origin: "ai",
+  status: "published", publish_at: null, published_at: iso(60), content_updated_at: iso(20), source_count: 3, publisher_count: 3, created_at: iso(65), ...extra });
+const stories = [
+  story(1),
+  story(2, { language: "en", title: "Strong quake off northern Japan prompts tsunami warning", dek: "A magnitude 7.4 earthquake struck off northern Japan and authorities warned of tsunami waves.", body: storyBody("en"), content_updated_at: null }),
+  story(4, { event_id: "e4", cluster_id: 77, title: "تقرير كامل آخر عن حدث في اليابان للاختبار", dek: "مقدمة تقرير آخر منشور لأغراض اختبار التقارير ذات الصلة.", content_updated_at: null }),
+  story(5, { event_id: "e5", cluster_id: 78, status: "draft", title: "مسودة لا يجب أن تظهر للقراء أبداً", published_at: null }),
+];
+const storySources = [1, 2, 4].flatMap((sid) => [
+  { story_id: sid, n: 1, publisher_name: "وكالة الأرصاد اليابانية", url: "https://jma.example/1", title: "Tsunami warning issued", language: "en", published_at: iso(80), verification: "official", license: null, source_id: 2, pending: false },
+  { story_id: sid, n: 2, publisher_name: "بي بي سي", url: "https://bbc.example/2", title: "Magnitude 7.4 earthquake", language: "en", published_at: iso(70), verification: "reported", license: "CC BY 4.0", source_id: 1, pending: false },
+  { story_id: sid, n: 3, publisher_name: "سكاي نيوز عربية", url: "https://sky.example/3", title: "أنباء عن قتيلين", language: "ar", published_at: iso(50), verification: "developing", license: null, source_id: 1, pending: false },
+]);
+const storyCorrections = [{ id: 1, story_id: 1, kind: "correction", note: "صُحّح عمق الزلزال وفق بيان الوكالة.", created_at: iso(20), is_public: true }];
+function pgFilter(rows, p) {
+  for (const [k, v] of p.entries()) {
+    if (["select", "order", "limit", "offset"].includes(k)) continue;
+    const m = v.match(/^(eq|neq|cs)\.(.*)$/);
+    if (!m) continue;
+    const val = m[2];
+    rows = rows.filter((r) => {
+      const x = r[k];
+      if (m[1] === "cs") return Array.isArray(x) && x.includes(val.replace(/^\{|\}$/g, ""));
+      const eq = String(x) === val || (typeof x === "number" && x === Number(val)) || (typeof x === "boolean" && String(x) === val);
+      return m[1] === "eq" ? eq : !eq;
+    });
+  }
+  return rows;
+}
 let failArticles = false;
 let emptyMode = false;
 
@@ -84,6 +131,14 @@ async function mock(page) {
       if (p.get("region")) rows = rows.filter((e) => e.region === p.get("region").slice(3));
       if (p.get("countries")) rows = rows.filter((e) => e.countries.includes(p.get("countries").replace(/^cs\.\{|\}$/g, "")));
       return json(rows);
+    }
+    if (u.pathname === "/rest/v1/news_stories" || u.pathname === "/rest/v1/news_story_sources" || u.pathname === "/rest/v1/news_story_corrections") {
+      const table = { "/rest/v1/news_stories": stories.filter((x) => x.status === "published"), "/rest/v1/news_story_sources": storySources,
+        "/rest/v1/news_story_corrections": storyCorrections }[u.pathname];
+      const rows = pgFilter(table, u.searchParams);
+      const accept = route.request().headers()["accept"] || "";
+      if (accept.includes("vnd.pgrst.object")) return rows[0] ? json(rows[0]) : json({ code: "PGRST116", message: "0 rows" }, 406);
+      return json(rows.slice(0, Number(u.searchParams.get("limit") || 50)));
     }
     if (u.pathname === "/rest/v1/rpc/news_country_counts") return json([{ country: "JP", region: "east_asia", n: 2 }, { country: "JO", region: "middle_east", n: 14 }]);
     if (u.pathname === "/rest/v1/rpc/news_search_articles") return json(articles.filter((a) => a.title.includes("زلزال")));
@@ -207,6 +262,61 @@ for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["desktop", {
   await page.waitForSelector(".state h3");
   check((await page.locator(".state h3").textContent()).includes("غير متوفر"), `${name}: missing article state`);
 
+  // full report («تقرير كامل»)
+  await page.goto(base + "/article.html?story=1");
+  await page.waitForSelector("article.story h1");
+  check((await page.locator("article.story h1").textContent()).includes("زلزال قوي"), `${name}: full report headline`);
+  check((await page.locator("article.story .dek").textContent()).includes("7.4"), `${name}: full report introduction`);
+  check((await page.locator(".story-section").count()) === 2 && (await page.locator(".story-section h2").first().textContent()) === "ماذا حدث", `${name}: report sections with headings`);
+  check((await page.locator(".story-section .kind-badge.k-statement").count()) === 1 && (await page.locator(".story-section .kind-badge.k-allegation").count()) === 1
+    && (await page.locator(".story-section .kind-badge.k-developing").count()) === 1, `${name}: statements, allegations and developing information labelled separately`);
+  check((await page.locator(".story-section.is-analysis").count()) === 1, `${name}: editorial analysis set apart`);
+  check((await page.locator(".story-section sup.cite a").first().getAttribute("href")) === "#ref-1", `${name}: paragraphs cite numbered sources`);
+  check((await page.locator(".story-sources li").count()) === 3 && (await page.locator("#ref-2 a.src-link").getAttribute("href")) === "https://bbc.example/2", `${name}: source list links each original report`);
+  check((await page.locator("#ref-2").textContent()).includes("CC BY 4.0"), `${name}: publisher licence shown with the source`);
+  check((await page.locator(".story-sources a.src-link").first().getAttribute("rel")).includes("nofollow"), `${name}: source links are nofollow/noopener`);
+  check((await page.locator(".story-timeline li").count()) === 2, `${name}: timeline rendered`);
+  check((await page.locator(".story-corrections li").count()) === 1 && (await page.locator(".story-corrections").textContent()).includes("تصحيح"), `${name}: public correction shown`);
+  check((await page.locator(".story .byline").textContent()).includes("مدة القراءة") && (await page.locator(".story .byline").textContent()).includes("حُدّث"), `${name}: reading time, published and updated times`);
+  check((await page.locator(".story .byline").textContent()).includes("فريق تحرير لحظة"), `${name}: author / editorial team`);
+  check((await page.locator(".story-legend").textContent()).includes("الذكاء الاصطناعي"), `${name}: AI assistance disclosed`);
+  check(await page.locator(".story-tools button", { hasText: "طباعة" }).count() === 1 && await page.locator('.story-tools a[href^="https://wa.me/"]').count() === 1, `${name}: share + print buttons`);
+  const seo = await page.evaluate(() => {
+    const ld = JSON.parse(document.getElementById("ld-article")?.textContent || "{}");
+    return { type: ld["@type"], head: ld.headline, cites: (ld.citation || []).length, lang: ld.inLanguage, published: ld.datePublished,
+      canon: document.querySelector('link[rel="canonical"]')?.href, og: document.querySelector('meta[property="og:title"]')?.content,
+      desc: document.querySelector('meta[name="description"]')?.content, robots: document.querySelector('meta[name="robots"]')?.content, title: document.title };
+  });
+  check(seo.type === "NewsArticle" && seo.head.includes("زلزال") && seo.cites === 3 && seo.lang === "ar" && !!seo.published, `${name}: NewsArticle structured data`);
+  check(seo.canon?.endsWith("article.html?story=1") && seo.og?.includes("زلزال") && seo.desc?.includes("7.4") && seo.robots?.startsWith("index") && seo.title.includes("لحظة"), `${name}: SEO + Open Graph metadata`);
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${name}: full report has no horizontal scroll`);
+  await page.waitForSelector("#rel-stories:not([hidden])", { timeout: 4000 }).catch(() => {});
+  check((await page.locator("#rel-stories li").count()) === 1 && (await page.locator("#rel-stories").textContent()).includes("تقرير كامل آخر"), `${name}: related reports (drafts never listed)`);
+  await page.emulateMedia({ media: "print" });
+  check(await page.evaluate(() => getComputedStyle(document.querySelector(".story-tools")).display === "none" && getComputedStyle(document.querySelector(".masthead")).display === "none"), `${name}: print layout hides navigation and buttons`);
+  await page.emulateMedia({ media: "screen" });
+  await page.screenshot({ path: `${outDir}/story-${name}.png`, fullPage: true });
+  await page.goto(base + "/article.html?story=5");
+  await page.waitForSelector(".state h3");
+  check((await page.locator(".state h3").textContent()).includes("غير متوفر"), `${name}: an unpublished draft is not shown to readers`);
+  await page.goto(base + "/article.html?id=1");
+  await page.waitForSelector("h1");
+  check((await page.locator("a.full-story-link").count()) === 1 && (await page.locator("a.full-story-link").getAttribute("href")) === "article.html?story=1", `${name}: report page links to the full report about its event`);
+  await page.goto(base + "/index.html");
+  await page.waitForSelector(".stories-panel:not([hidden]) li", { timeout: 6000 }).catch(() => {});
+  check((await page.locator(".stories-panel li").count()) === 2, `${name}: home lists published full reports`);
+  const parse = await page.evaluate(async () => {
+    const m = await import("/assets/js/admin-stories.js");
+    const b = { sections: [{ key: "event", paras: [{ t: "نص أول", k: "fact", r: [1, 2] }, { t: "نص ثان", k: "allegation", r: [3] }] },
+      { key: "analysis", heading: "قراءة", paras: [{ t: "تحليل", k: "analysis", r: [] }] }], timeline: [{ at: "2026-11-06T09:05:00.000Z", t: "حدث", r: [1] }] };
+    const back = m.textToBody(m.bodyToText(b));
+    const bad = m.textToBody("## event\n[fact] بلا مصدر\n## nonsense\n[rumour] x {1}");
+    return { same: JSON.stringify(back.body) === JSON.stringify(b) && back.errors.length === 0,
+      errors: bad.errors.some((e) => e.includes("{1,3}")) && bad.errors.some((e) => e.includes("nonsense")) };
+  });
+  check(parse.same, `${name}: admin editor text format round-trips the article body`);
+  check(parse.errors, `${name}: admin editor reports missing sources and unknown sections`);
+
   // global breaking page
   await page.goto(base + "/breaking.html");
   await page.waitForSelector(".timeline h3");
@@ -256,6 +366,18 @@ for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["desktop", {
   await page.locator(".lang-btn").click();
   await page.waitForSelector("h1");
   check(await page.evaluate(() => document.documentElement.dir === "rtl") && (await page.locator("h1").textContent()).includes("اليابان"), `${name}: switch back to Arabic`);
+
+  // English edition opens the linked English version of the same report
+  await page.goto(base + "/article.html?story=1&lang=en");
+  await page.waitForSelector("article.story h1");
+  check(page.url().includes("story=2") && (await page.locator("article.story h1").textContent()).startsWith("Strong quake"), `${name}: English edition opens the linked English report`);
+  check(await page.evaluate(() => document.querySelector("article.story").dir === "ltr" && document.querySelector(".story-section h2").textContent === "What happened"), `${name}: English report layout and headings`);
+  check(await page.evaluate(() => JSON.parse(document.getElementById("ld-article").textContent).inLanguage === "en"), `${name}: English structured data`);
+  await page.screenshot({ path: `${outDir}/story-en-${name}.png`, fullPage: true });
+  await page.goto(base + "/article.html?story=4&lang=en");
+  await page.waitForSelector("article.story h1");
+  check(await page.evaluate(() => document.querySelector("article.story").dir === "rtl") && (await page.locator("article.story").textContent()).includes("available in Arabic only"), `${name}: Arabic-only report keeps RTL inside the English edition`);
+  await page.evaluate(() => localStorage.setItem("nabd-lang", "ar"));
 
   // search
   await page.goto(base + "/index.html?q=" + encodeURIComponent("زلزال"));

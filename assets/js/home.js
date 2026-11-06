@@ -1,5 +1,6 @@
 // Home / category / search page.
 import { sb, h, ARTICLE_COLS, CAT_NAME, configured, loadSources, friendlyError, notConfiguredState, store, ago } from "./common.js";
+import { fetchLatestStories, storyListItem } from "./stories.js";
 import { renderChrome, fetchStatus, ICONS } from "./layout.js";
 import { card, leadBlock, rankScore, sectionBlock } from "./cards.js";
 import { Live } from "./live.js";
@@ -65,6 +66,9 @@ const leadSlot = h("div");
 const sectionsSlot = h("div");
 const breakingPanel = h("ul", { class: "mini-list" });
 const statusPanel = h("div", { class: "src-status" });
+const storiesList = h("ul", { class: "mini-list" });
+const storiesPanel = h("section", { class: "panel stories-panel", hidden: true },
+  h("h2", {}, h("span", { class: "chip story-chip" }, L("تقارير كاملة", "Full reports")), L("قصص مفصّلة بمصادرها", "in-depth, fully sourced")), storiesList);
 
 function skeleton() { return h("ul", { class: "skeleton", "aria-hidden": "true" }, Array.from({ length: 6 }, () => h("li"))); }
 
@@ -80,6 +84,7 @@ function layout() {
       h("aside", {},
         h("section", { class: "panel" }, h("h2", {}, h("span", { class: "chip breaking" }, L("عاجل", "Breaking")), L("عالمياً الآن", "worldwide now")), breakingPanel,
           h("a", { href: geoName ? `breaking.html?${region ? "region=" + region : "country=" + country}` : "breaking.html", class: "note" }, L("كل الأخبار العاجلة العالمية ←", "All global breaking news →"))),
+        q ? null : storiesPanel,
         q ? null : weatherPanel(),
         h("section", { class: "panel" }, h("h2", {}, L("حالة المصادر", "Source status")), statusPanel,
           h("p", { class: "note" }, L("يجلب الخادم الأخبار تلقائياً كل دقيقة، ولكل مصدر فترة جلب تحترم شروطه. ", "News is fetched automatically every minute; each source has its own polite polling interval. "), h("a", { href: "sources.html" }, L("المنهجية", "Methodology")))))));
@@ -207,10 +212,13 @@ async function loadMore() {
 async function loadSide() {
   const now = new Date().toISOString();
   void now;
-  const [events, status] = await Promise.all([
+  const [events, status, stories] = await Promise.all([
     fetchGlobalEvents({ breakingOnly: true, region, country, limit: 6 }).catch(() => []),
     fetchStatus().catch(() => null),
+    fetchLatestStories({ limit: 5, category: cat || null, country: country || null }).catch(() => []),
   ]);
+  storiesPanel.hidden = !stories.length;
+  storiesList.replaceChildren(...stories.map(storyListItem));
   breakingPanel.replaceChildren(...(events.length ? events.map(eventRow)
     : [h("li", { class: "note" }, L("لا أخبار عاجلة حالياً.", "No breaking news right now."))]));
   const srcs = [...state.sources.values()].filter((s) => s.enabled);

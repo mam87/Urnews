@@ -18,14 +18,18 @@ jobs:
       - name: Ingest pipeline unit tests (parsing, dedup, time zones, backoff, AI guard rails)
         working-directory: supabase/functions/news-ingest
         run: deno test -A tests/
+      - name: Full-article generator tests (sourcing, numbers, quotes, copying, labels, drafts only)
+        working-directory: supabase/functions/news-stories
+        run: deno test -A tests/
       - name: Type-check edge functions
         run: |
           (cd supabase/functions/news-ingest && deno check index.ts)
           (cd supabase/functions/news-notify && deno check index.ts)
+          (cd supabase/functions/news-stories && deno check index.ts)
       - name: Database tests (RLS, permissions, dedup, scheduler lease, alerts, search)
         env: { PGHOST: localhost, PGPORT: 5432, PGUSER: postgres, PGPASSWORD: postgres }
         run: |
           sudo apt-get install -y postgresql-client >/dev/null
           tests/run-sql-tests.sh | tee /tmp/out.txt
           ! grep -q "FAIL" /tmp/out.txt
-          test "$(grep -c '^  ok -' /tmp/out.txt)" -ge 70
+          test "$(grep -c '^  ok -' /tmp/out.txt)" -ge 190

@@ -15,6 +15,7 @@ running.
 | `supabase/migrations/` | Schema, RLS & grants, functions, seed data, scheduler, sources |
 | `supabase/functions/news-ingest/` | Feed fetch → parse → classify → dedupe/cluster → optional AI → insert |
 | `supabase/functions/news-notify/` | Admin alerts (Telegram / e-mail) |
+| `supabase/functions/news-stories/` | Draft full articles from stored reports, with fact/copy validator |
 | `assets/js/` | Site + admin (vanilla ES modules, vendored supabase-js) |
 | `tests/` | SQL/RLS tests, UI smoke tests; Deno tests live in `supabase/functions/news-ingest/tests/` |
 | `guide/SETUP.md` | Setup, adding sources, rotating keys, backups/restore, costs |
@@ -37,6 +38,15 @@ running.
 * Arabic/English switch (masthead), remembered per browser. English reports are kept in English for the
   English edition; top-ranked English-only events get an Arabic headline from the AI budget first.
 
+## Full original reports (2026-11-06, not yet deployed)
+* For important events with 3+ reports from 2+ independent publishers, an optional generator (`news-stories`)
+  writes an **original** Arabic and English article from the stored headlines + publisher excerpts only:
+  sections, timeline, labelled paragraphs (corroborated / statement / allegation / developing / analysis),
+  numbered source references. Invented numbers, quotes or names and copied word runs are removed automatically.
+* **Drafts only** — editors approve, edit, schedule, publish, correct (admin → التقارير الكاملة); enforced in the DB.
+* `article.html?story=ID`: hero image (licensed feed thumbnail, credited), times, reading time, share/print,
+  corrections, SEO + NewsArticle JSON-LD. Details, safeguards and deployment: `guide/FULL_ARTICLES.md`.
+
 ## Sections
 World · Politics · Economy & Business · Tech & AI · Health & Science · Environment & Climate · Arab world ·
 Palestine · Jordan · Sports · Weather · Security & Crime · Education · Arts & Culture (world first; no country is pinned).
@@ -54,6 +64,7 @@ secondary tag: a strike in Gaza stays under Palestine and is also tagged *securi
 ## Tests
 ```bash
 (cd supabase/functions/news-ingest && deno test -A tests/)
+(cd supabase/functions/news-stories && deno test -A tests/)
 PGHOST=/path PGPORT=5432 tests/run-sql-tests.sh
 node tests/ui/smoke.mjs . /tmp/shots
 ```

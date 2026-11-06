@@ -1,6 +1,7 @@
 // Admin dashboard. Every action here is authorised again in the database (RLS + is_admin()).
 // Hiding this UI from non-admins is a convenience, not the security boundary.
 import { sb, h, configured, notConfiguredState, CATEGORIES, CAT_NAME, VERIFICATION, ago, full, time, toast, friendlyError, initTheme } from "./common.js";
+import { storiesTab } from "./admin-stories.js";
 
 const root = document.getElementById("app");
 document.title = "لوحة التحرير — لحظة";
@@ -9,7 +10,7 @@ let me = null; let role = null; let current = "overview";
 const STATUS_AR = { published: "منشور", pending: "قيد المراجعة", hidden: "مخفي", rejected: "مرفوض" };
 
 function shell(content) {
-  const tabs = [["overview", "نظرة عامة"], ["articles", "الأخبار"], ["sources", "المصادر"], ["logs", "السجلات والأخطاء"], ["live", "البث المباشر"], ["settings", "الإعدادات"], ["editors", "المحررون"]];
+  const tabs = [["overview", "نظرة عامة"], ["stories", "التقارير الكاملة"], ["articles", "الأخبار"], ["sources", "المصادر"], ["logs", "السجلات والأخطاء"], ["live", "البث المباشر"], ["settings", "الإعدادات"], ["editors", "المحررون"]];
   root.replaceChildren(
     h("div", { class: "section-head" }, h("h2", {}, "لوحة التحرير"), h("span", { class: "meta" }, me?.email || ""),
       h("div", { class: "tools" }, h("a", { class: "btn", href: "index.html" }, "الموقع"), h("button", { class: "btn", type: "button", onclick: async () => { await sb.auth.signOut(); location.reload(); } }, "خروج"))),
@@ -21,7 +22,7 @@ const body = () => document.getElementById("admin-body");
 async function go(tab) {
   current = tab;
   shell(h("ul", { class: "skeleton" }, h("li"), h("li"), h("li")));
-  try { await ({ overview, articles, sources, logs, live, settings, editors })[tab](); }
+  try { await ({ overview, stories: () => storiesTab(body(), dialog), articles, sources, logs, live, settings, editors })[tab](); }
   catch (e) { console.error(e); body().replaceChildren(h("div", { class: "error-box" }, friendlyError(e), h("div", { class: "note" }, String(e?.message || "")))); }
 }
 const must = ({ data, error }) => { if (error) throw error; return data; };
@@ -142,12 +143,13 @@ async function sources() {
     h("div", { class: "toolbar" }, h("button", { class: "btn btn-primary", type: "button", onclick: addSourceDialog }, "إضافة مصدر"),
       h("span", { class: "note" }, "الفترة بالدقائق؛ لا يمكن أن تقل عن الحد الأدنى المسجل لشروط المصدر.")),
     h("div", { class: "table-wrap" }, h("table", {},
-      h("thead", {}, h("tr", {}, ["المصدر", "الحالة", "آخر نجاح", "24 ساعة", "تشغيل", "صور", "الفترة", "الموثوقية", ""].map((x) => h("th", {}, x)))),
+      h("thead", {}, h("tr", {}, ["المصدر", "الحالة", "آخر نجاح", "24 ساعة", "تشغيل", "صور", "الفترة", "الموثوقية", "الترخيص", ""].map((x) => h("th", {}, x)))),
       h("tbody", {}, rows.map((s) => {
         const enabled = h("input", { type: "checkbox", checked: s.enabled, "aria-label": "مفعل" });
         const imgs = h("input", { type: "checkbox", checked: s.allow_images, "aria-label": "عرض الصور", title: "عرض الصور المصغّرة التي يوفرها المصدر في خلاصته" });
         const interval = h("input", { type: "number", min: s.min_interval_minutes, max: "1440", value: s.poll_interval_minutes, style: "width:70px" });
         const rel = h("select", {}, [1, 2, 3, 4, 5].map((n) => h("option", { value: n, selected: s.reliability === n }, "★".repeat(n))));
+        const lic = h("input", { value: s.license || "", maxlength: "80", placeholder: "الترخيص", title: "ترخيص محتوى الناشر إن وُجد (مثل CC BY 4.0) — يظهر مع مراجع التقارير الكاملة", style: "width:110px" });
         const ok = s.consecutive_failures === 0 && s.last_status !== "blocked";
         return h("tr", {},
           h("td", {}, h("b", {}, s.name_ar), h("span", { class: "sub", dir: "ltr" }, s.feed_url), h("span", { class: "sub" }, `${s.kind} · ${s.language} · ${CAT_NAME[s.default_category] || "—"}`)),
@@ -156,9 +158,9 @@ async function sources() {
             s.next_fetch_at ? h("span", { class: "sub" }, "التالي: " + time(s.next_fetch_at)) : null),
           h("td", { class: "num" }, s.last_success_at ? ago(s.last_success_at) : "—"),
           h("td", { class: "num" }, `${s.fetches_24h} جلب · ${s.errors_24h} خطأ · ${s.new_24h} جديد`, h("span", { class: "sub" }, `7 أيام: ${s.published_7d} خبراً، ${s.rejected_7d} مرفوض/مخفي`)),
-          h("td", {}, enabled), h("td", {}, imgs), h("td", {}, interval), h("td", {}, rel),
+          h("td", {}, enabled), h("td", {}, imgs), h("td", {}, interval), h("td", {}, rel), h("td", {}, lic),
           h("td", {}, h("div", { class: "row-actions" },
-            h("button", { class: "btn btn-primary", type: "button", onclick: () => save(s.id, { enabled: enabled.checked, allow_images: imgs.checked, poll_interval_minutes: Number(interval.value), reliability: Number(rel.value) }) }, "حفظ"),
+            h("button", { class: "btn btn-primary", type: "button", onclick: () => save(s.id, { enabled: enabled.checked, allow_images: imgs.checked, poll_interval_minutes: Number(interval.value), reliability: Number(rel.value), license: lic.value.trim() || null }) }, "حفظ"),
             h("button", { class: "btn", type: "button", onclick: () => save(s.id, { next_fetch_at: new Date().toISOString() }) }, "جلب الآن"))));
       })))));
 }
