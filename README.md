@@ -70,6 +70,10 @@ running.
 * `mine.html` («لحظتي»): "For you" feed from followed countries and sections, saved stories and full reports (Save button
   on article pages), follow management — stored only in the browser (localStorage), no account.
 
+## Monetization readiness & final report (2026-11-07)
+* Labelled house-ad slots, sponsor label and a consent-based newsletter sign-up (CSV export in admin) — all off by
+  default; see `guide/MONETIZATION.md`. Full implementation report: `guide/FINAL_REPORT.md`.
+
 ## Sections
 World · Politics · Economy & Business · Tech & AI · Health & Science · Environment & Climate · Arab world ·
 Palestine · Jordan · Sports · Weather · Security & Crime · Education · Arts & Culture (world first; no country is pinned).
@@ -93,4 +97,5 @@ node tests/ui/smoke.mjs . /tmp/shots
 node tests/ui/sports-smoke.mjs . /tmp/shots
 node tests/ui/reels-smoke.mjs . /tmp/shots
 node tests/ui/map-mine-smoke.mjs . /tmp/shots
+node tests/ui/monetize-smoke.mjs . /tmp/shots
 ```

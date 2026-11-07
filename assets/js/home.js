@@ -8,6 +8,7 @@ import { weatherPanel } from "./weather.js";
 import { EN, L, REGION_NAME, countryName, flag, isCountry, langFilter, inLang } from "./i18n.js";
 import { fetchGlobalEvents, eventRow } from "./global.js";
 import { followButton } from "./saved.js";
+import { adSlot, newsletterBox, mount } from "./monetize.js";
 import { toast } from "./common.js";
 
 const params = new URLSearchParams(location.search);
@@ -316,6 +317,7 @@ function showError(e) {
 
 async function boot() {
   layout();
+  { const side = root.querySelector("aside"); if (side) { mount(side, adSlot("home_side")); mount(side, newsletterBox()); } }
   if (!configured) return notConfiguredState(feedEl);
   try {
     state.sources = await loadSources();

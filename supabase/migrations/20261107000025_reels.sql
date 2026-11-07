@@ -146,10 +146,10 @@ begin
 
   delete from news_videos where published_at < now() - interval '14 days';
 
-  -- request feeds that are due (each channel at most every 9 minutes)
+  -- request feeds that are due (each run collects the previous run's responses and re-requests: every channel every 10 minutes)
   with due as (
     select channel_id from news_video_channels
-    where enabled and (last_fetch_at is null or last_fetch_at < now() - interval '9 minutes')
+    where enabled and (last_fetch_at is null or last_fetch_at < now() - interval '5 minutes')
       and not exists (select 1 from news_video_fetches q where q.channel_id = news_video_channels.channel_id)
   ), req as (
     insert into news_video_fetches (request_id, channel_id)

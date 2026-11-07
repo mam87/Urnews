@@ -7,6 +7,7 @@ import { renderChrome } from "./layout.js";
 import { EN, L, langFilter } from "./i18n.js";
 import { card } from "./cards.js";
 import { sports, ATTRIBUTION } from "./sports-data.js";
+import { adSlot, mount } from "./monetize.js";
 import { SPORTS, COMPETITIONS, COMP_BY_SLUG, COMP_BY_NAME, teamAr, teamAliases } from "./sports-names.js";
 
 const chrome = renderChrome({ active: "sports" });
@@ -425,4 +426,5 @@ try {
   console.error(e);
   root.replaceChildren(errorState({ error: "unavailable" }, () => location.reload()));
 }
+mount(root, adSlot("sports"));
 chrome.refreshTicker().catch(() => {});

@@ -5,6 +5,7 @@ import { EN, L, titleOf, titleDir, flag, countryName, isCountry, REGION_NAME } f
 import { Live } from "./live.js";
 import { renderStory } from "./story-view.js";
 import { saveButton } from "./saved.js";
+import { adSlot, newsletterBox, mount } from "./monetize.js";
 import { storyForCluster, storyHref } from "./stories.js";
 
 const chrome = renderChrome({ active: "article" });
@@ -109,6 +110,8 @@ async function render() {
       h("ul", { class: "mini-list" }, moreCat.filter((m) => (EN ? m.title_en : m.language === "ar")).map((m) => h("li", {}, h("a", { href: `article.html?id=${m.id}`, dir: titleDir(m) }, titleOf(m)), h("span", { class: "t num" }, ((EN ? sources.get(m.source_id)?.name_en : null) || sources.get(m.source_id)?.name_ar || "") + " · " + ago(m.published_at)))))) : null);
 
   root.replaceChildren(h("div", { class: "article-wrap" }, main, aside));
+  mount(main, adSlot("article"));
+  mount(main, newsletterBox());
   // Mobile sticky "read full article" only once the in-page button has scrolled away.
   const sticky = main.querySelector(".sticky-cta"), inline = main.querySelector(".cta");
   if (sticky && inline && "IntersectionObserver" in window) {

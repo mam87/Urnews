@@ -249,7 +249,9 @@ async function live() {
 async function settings() {
   const rows = must(await sb.from("news_settings").select("key,value,description,updated_at").order("key"));
   body().replaceChildren(h("div", { class: "table-wrap" }, h("table", {}, h("tbody", {}, rows.filter((r) => r.key !== "owner_email").map((r) => {
-    const input = h("input", { value: JSON.stringify(r.value), dir: "ltr", style: "width:160px" });
+    const big = r.value !== null && typeof r.value === "object";
+    const input = big ? h("textarea", { dir: "ltr", rows: "6", style: "width:min(100%,520px);font-family:monospace;font-size:.8rem" }, JSON.stringify(r.value, null, 2))
+      : h("input", { value: JSON.stringify(r.value), dir: "ltr", style: "width:160px" });
     return h("tr", {},
       h("td", {}, h("b", { dir: "ltr" }, r.key), h("span", { class: "sub" }, r.description || "")),
       h("td", {}, input),
@@ -257,7 +259,25 @@ async function settings() {
         let value; try { value = JSON.parse(input.value); } catch { return toast("قيمة JSON غير صالحة (أرقام، true/false، أو نص بين علامتي تنصيص)"); }
         try { must(await sb.from("news_settings").update({ value }).eq("key", r.key)); toast("حُفظ"); } catch (e) { toast(friendlyError(e)); }
       } }, "حفظ")));
-  })))), h("p", { class: "note" }, "ingest_enabled=false يوقف الجلب بالكامل. فترة المجدول الفعلية تُضبط في pg_cron (انظر دليل الإعداد)."));
+  })))), h("p", { class: "note" }, "ingest_enabled=false يوقف الجلب بالكامل. فترة المجدول الفعلية تُضبط في pg_cron (انظر دليل الإعداد)."),
+    await newsletterAdmin());
+}
+
+// Newsletter sign-ups: count + CSV export (sending needs an e-mail provider — guide/MONETIZATION.md).
+async function newsletterAdmin() {
+  const box = h("section", { class: "panel", style: "margin-top:20px" }, h("h2", {}, "النشرة البريدية"));
+  const { data, error } = await sb.from("news_newsletter_subscribers").select("email,language,status,created_at").order("created_at", { ascending: false }).limit(5000);
+  if (error) { box.append(h("p", { class: "note" }, friendlyError(error))); return box; }
+  const active = data.filter((r) => r.status !== "unsubscribed");
+  const csv = () => {
+    const esc = (v) => `"${String(v).replace(/"/g, '""')}"`;
+    const text = ["email,language,status,created_at", ...data.map((r) => [r.email, r.language, r.status, r.created_at].map(esc).join(","))].join("\n");
+    const a = h("a", { href: URL.createObjectURL(new Blob(["\ufeff" + text], { type: "text/csv" })), download: "lahza-newsletter.csv" }); document.body.append(a); a.click(); a.remove();
+  };
+  box.append(h("p", {}, `المشتركون: ${active.length} (عربي ${active.filter((r) => r.language === "ar").length} · إنجليزي ${active.filter((r) => r.language === "en").length})`),
+    h("div", { class: "toolbar" }, h("button", { class: "btn", type: "button", onclick: csv, disabled: !data.length }, "تنزيل CSV")),
+    h("p", { class: "note" }, "الاشتراك يظهر للقراء فقط عندما newsletter_enabled = true. لا يُرسل شيء تلقائياً."));
+  return box;
 }
 
 /* ---------------- editors ---------------- */

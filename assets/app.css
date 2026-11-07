@@ -805,3 +805,17 @@ html[dir="ltr"] .map-row .bar { --bar-dir: right; }
 .saved-tools { margin-top: 6px; }
 .saved-plain { grid-template-columns: 0 1fr; }
 .sp-tabs .count { font-weight: 600; opacity: .7; }
+
+/* ---------- Monetization slots (off unless enabled in admin settings) ---------- */
+.ad-slot { margin: 16px 0; padding: 12px; border: 1px dashed var(--rule); border-radius: var(--radius); background: var(--bg-2); }
+.ad-slot .ad-label { display: block; font-size: .6875rem; color: var(--ink-3); margin-bottom: 6px; letter-spacing: .02em; }
+.ad-slot a { display: grid; gap: 4px; color: var(--ink); text-decoration: none; }
+.ad-slot img { width: 100%; height: auto; max-height: 220px; object-fit: cover; border-radius: 8px; }
+.ad-slot b { font-family: var(--f-head); }
+.ad-slot a > span { color: var(--ink-2); font-size: .875rem; }
+.newsletter { margin: 16px 0; padding: 14px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--bg-2); }
+.newsletter h2 { margin: 0 0 4px; font-family: var(--f-head); font-size: 1.05rem; }
+.nl-row { display: flex; gap: 8px; margin: 8px 0; }
+.nl-row input { flex: 1; min-width: 0; height: 40px; padding: 0 12px; border: 1px solid var(--rule); border-radius: 999px; background: var(--bg); color: var(--ink); font: inherit; }
+.nl-row .btn { height: 40px; }
+.nl-consent { display: flex; gap: 8px; align-items: flex-start; font-size: .75rem; color: var(--ink-2); }
