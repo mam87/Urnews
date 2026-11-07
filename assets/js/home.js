@@ -80,6 +80,7 @@ function layout() {
         q || cat || region || country ? null : sectionsSlot,
         h("div", { class: "section-head" }, h("h2", {}, title), metaEl,
           q ? null : h("div", { class: "tools" }, sortSeg, pauseBtn)),
+        cat === "sports" ? h("a", { class: "sp-cta", href: "sports.html" }, "⚽ ", L("النتائج المباشرة، المواعيد، الترتيب والهدافون — المركز الرياضي ←", "Live scores, fixtures, tables & top scorers — Sports Centre →")) : null,
         banner, feedEl, loadMore_),
       h("aside", {},
         h("section", { class: "panel" }, h("h2", {}, h("span", { class: "chip breaking" }, L("عاجل", "Breaking")), L("عالمياً الآن", "worldwide now")), breakingPanel,

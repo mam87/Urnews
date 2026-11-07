@@ -47,6 +47,15 @@ running.
 * `article.html?story=ID`: hero image (licensed feed thumbnail, credited), times, reading time, share/print,
   corrections, SEO + NewsArticle JSON-LD. Details, safeguards and deployment: `guide/FULL_ARTICLES.md`.
 
+## Sports centre (2026-11-07)
+* `sports.html`: live scores and fixtures by day (football, basketball, tennis, cricket), league tables, top scorers,
+  assists, World Cup bracket, match centre (goals, cards, substitutions, half-time), team and player pages with
+  related Lahza news. Champions League, Premier League, La Liga, Serie A, Bundesliga, Ligue 1, Europa League,
+  Saudi Pro League, Jordanian Pro League.
+* Data: SportScore free public API (no key, called from the reader's browser, attribution shown). Cached, retried
+  with backoff, polled only while visible (30 s for live matches); failures show delayed or unavailable data, never
+  invented scores. Details: `guide/SPORTS.md`.
+
 ## Sections
 World · Politics · Economy & Business · Tech & AI · Health & Science · Environment & Climate · Arab world ·
 Palestine · Jordan · Sports · Weather · Security & Crime · Education · Arts & Culture (world first; no country is pinned).
@@ -67,4 +76,5 @@ secondary tag: a strike in Gaza stays under Palestine and is also tagged *securi
 (cd supabase/functions/news-stories && deno test -A tests/)
 PGHOST=/path PGPORT=5432 tests/run-sql-tests.sh
 node tests/ui/smoke.mjs . /tmp/shots
+node tests/ui/sports-smoke.mjs . /tmp/shots
 ```
