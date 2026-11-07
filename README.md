@@ -62,6 +62,14 @@ running.
 * Collected every 10 minutes by the database scheduler from the publishers' free public Shorts feeds (metadata only,
   14-day retention). Details: `guide/REELS.md`.
 
+## World news map & My Lahza (2026-11-07)
+* `map.html`: world map (Natural Earth 1:110m, pre-projected by `scripts/gen-world-map.mjs` into `assets/world-map.json` —
+  no map library) shaded by stories per country over 6 h / 24 h / 7 days, with themes (conflict, disasters, politics,
+  economy, tech) from `news_map_counts()` (migration 26). Countries come from the classifier's tags, never invented
+  coordinates; breaking countries are outlined; tap a country for its top stories, follow it, or use the ranked list.
+* `mine.html` («لحظتي»): "For you" feed from followed countries and sections, saved stories and full reports (Save button
+  on article pages), follow management — stored only in the browser (localStorage), no account.
+
 ## Sections
 World · Politics · Economy & Business · Tech & AI · Health & Science · Environment & Climate · Arab world ·
 Palestine · Jordan · Sports · Weather · Security & Crime · Education · Arts & Culture (world first; no country is pinned).
@@ -84,4 +92,5 @@ PGHOST=/path PGPORT=5432 tests/run-sql-tests.sh
 node tests/ui/smoke.mjs . /tmp/shots
 node tests/ui/sports-smoke.mjs . /tmp/shots
 node tests/ui/reels-smoke.mjs . /tmp/shots
+node tests/ui/map-mine-smoke.mjs . /tmp/shots
 ```

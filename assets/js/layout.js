@@ -88,8 +88,9 @@ export function renderChrome({ active = "home" } = {}) {
       h("span", { class: "hide-sm" }, L("بتوقيت عمّان", "Amman time")),
       h("span", { class: "push" },
         h("a", { href: "live.html" }, L("البث المباشر", "Live TV")),
-        h("a", { href: "sports.html" }, L("النتائج المباشرة", "Live scores")),
+        h("a", { href: "sports.html", class: "hide-sm" }, L("النتائج المباشرة", "Live scores")),
         h("a", { href: "reels.html", class: "hide-sm" }, L("ريلز", "Reels")),
+        h("a", { href: "mine.html" }, L("لحظتي", "My Lahza")),
         h("a", { href: "sources.html", class: "hide-sm" }, L("المصادر", "Sources")),
         h("button", { type: "button", class: "linklike", lang: EN ? "ar" : "en", style: "border:0;background:none;padding:0;cursor:pointer;color:var(--ink-2);font:inherit;font-weight:700", onclick: () => setLang(EN ? "ar" : "en") }, EN ? "العربية" : "English"),
         h("button", { type: "button", class: "linklike", style: "border:0;background:none;padding:0;cursor:pointer;color:var(--ink-2);font:inherit", onclick: settingsDialog }, L("حجم الخط والإعدادات", "Text size & settings")))));
@@ -118,6 +119,8 @@ export function renderChrome({ active = "home" } = {}) {
       h("a", { href: "live.html", class: "live-link", "aria-current": active === "live" ? "page" : null }, L("بث مباشر", "Live TV")),
       h("a", { href: "sports.html", class: "sports-link", "aria-current": active === "sports" ? "page" : null }, L("المركز الرياضي", "Sports Centre")),
       h("a", { href: "reels.html", class: "reels-link" }, L("ريلز", "Reels")),
+      h("a", { href: "map.html", "aria-current": active === "map" ? "page" : null }, L("خريطة العالم", "World map")),
+      h("a", { href: "mine.html", "aria-current": active === "mine" ? "page" : null }, L("لحظتي", "My Lahza")),
       CATEGORIES.map(([slug, name]) => h("a", { href: `index.html?cat=${slug}`, "aria-current": cat === slug ? "page" : null, dataset: { cat: slug } },
         h("span", { class: "dot", style: `background:var(--c-${slug})`, "aria-hidden": "true" }), name))));
 
@@ -135,6 +138,8 @@ export function renderChrome({ active = "home" } = {}) {
             h("li", {}, h("a", { href: "live.html" }, L("البث المباشر", "Live TV"))),
             h("li", {}, h("a", { href: "sports.html" }, L("المركز الرياضي والنتائج المباشرة", "Sports centre & live scores"))),
             h("li", {}, h("a", { href: "reels.html" }, L("لحظة ريلز: فيديوهات قصيرة", "Lahza Reels: short videos"))),
+            h("li", {}, h("a", { href: "map.html" }, L("خريطة الأخبار العالمية", "World news map"))),
+            h("li", {}, h("a", { href: "mine.html" }, L("لحظتي: المحفوظات وما أتابعه", "My Lahza: saved & following"))),
             h("li", {}, h("a", { href: "sources.html" }, L("المصادر ومنهجية العمل", "Sources & methodology"))),
             h("li", {}, h("button", { type: "button", style: "border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit", onclick: settingsDialog }, L("إعدادات القراءة", "Reading settings"))),
             h("li", {}, h("a", { href: "admin.html" }, L("دخول المحررين", "Editors")))))),

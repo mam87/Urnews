@@ -4,6 +4,7 @@ import { renderChrome, fetchStatus, ICONS } from "./layout.js";
 import { EN, L, titleOf, titleDir, flag, countryName, isCountry, REGION_NAME } from "./i18n.js";
 import { Live } from "./live.js";
 import { renderStory } from "./story-view.js";
+import { saveButton } from "./saved.js";
 import { storyForCluster, storyHref } from "./stories.js";
 
 const chrome = renderChrome({ active: "article" });
@@ -78,7 +79,7 @@ async function render() {
       h("p", { class: "summary-box", dir }, summary),
       h("div", { class: "summary-label" }, "ℹ︎ ", SUMMARY_KIND[a.summary_kind] || SUMMARY_KIND.feed, a.edited ? L(" · عُدّل تحريرياً", " · edited") : ""),
     ] : h("p", { class: "note" }, L("لا يتوفر مقتطف لهذا الخبر في خلاصة المصدر.", "The source's feed has no excerpt for this story.")),
-    h("div", { class: "cta" }, readFull(), h("button", { class: "btn", type: "button", onclick: share }, ICONS.share(), L("مشاركة", "Share"))),
+    h("div", { class: "cta" }, readFull(), h("button", { class: "btn", type: "button", onclick: share }, ICONS.share(), L("مشاركة", "Share")), saveButton("article", a.id, head, toast)),
     h("p", { class: "read-more-note" }, L("نعرض مقتطفاً فقط؛ النص الكامل والصور والفيديو متاحة على موقع " + srcName + " الرسمي.", "We show an excerpt only; the full text, images and video are on " + srcName + "'s own site.")),
     related.length ? h("section", { class: "coverage" },
       h("h2", {}, L(`ماذا تقول المصادر الأخرى؟ (${related.length})`, `What other sources say (${related.length})`)),

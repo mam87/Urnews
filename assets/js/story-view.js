@@ -3,6 +3,7 @@
 import { sb, h, full, ago, CAT_NAME, toast, friendlyError } from "./common.js";
 import { EN, L, flag, countryName, isCountry, REGION_NAME } from "./i18n.js";
 import { ICONS } from "./layout.js";
+import { saveButton } from "./saved.js";
 import {
   STORY_COLS, SITE_LANG, storyHref, kindLabels, sectionLabels, CORRECTION, STORY_STATUS, bylineText, readingMinutes, fetchLatestStories, storyListItem,
 } from "./stories.js";
@@ -92,7 +93,8 @@ function shareBar(s) {
     ext("WhatsApp", `https://wa.me/?text=${text}%20${enc(url)}`),
     ext("Telegram", `https://t.me/share/url?url=${enc(url)}&text=${text}`),
     h("button", { class: "btn", type: "button", onclick: copy }, L("نسخ الرابط", "Copy link")),
-    h("button", { class: "btn", type: "button", onclick: () => window.print() }, L("طباعة", "Print")));
+    h("button", { class: "btn", type: "button", onclick: () => window.print() }, L("طباعة", "Print")),
+    saveButton("story", s.id, s.title, toast));
 }
 
 export async function renderStory(root, id) {

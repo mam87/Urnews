@@ -7,6 +7,8 @@ import { Live } from "./live.js";
 import { weatherPanel } from "./weather.js";
 import { EN, L, REGION_NAME, countryName, flag, isCountry, langFilter, inLang } from "./i18n.js";
 import { fetchGlobalEvents, eventRow } from "./global.js";
+import { followButton } from "./saved.js";
+import { toast } from "./common.js";
 
 const params = new URLSearchParams(location.search);
 const cat = CAT_NAME[params.get("cat")] ? params.get("cat") : null;
@@ -79,7 +81,10 @@ function layout() {
         q ? null : leadSlot,
         q || cat || region || country ? null : sectionsSlot,
         h("div", { class: "section-head" }, h("h2", {}, title), metaEl,
-          q ? null : h("div", { class: "tools" }, sortSeg, pauseBtn)),
+          q ? null : h("div", { class: "tools" },
+            cat ? followButton("cats", cat, CAT_NAME[cat], toast) : null,
+            country ? followButton("countries", country, countryName(country), toast) : null,
+            sortSeg, pauseBtn)),
         cat === "sports" ? h("a", { class: "sp-cta", href: "sports.html" }, "⚽ ", L("النتائج المباشرة، المواعيد، الترتيب والهدافون — المركز الرياضي ←", "Live scores, fixtures, tables & top scorers — Sports Centre →")) : null,
         banner, feedEl, loadMore_),
       h("aside", {},
