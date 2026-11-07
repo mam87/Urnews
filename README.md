@@ -56,6 +56,12 @@ running.
   with backoff, polled only while visible (30 s for live matches); failures show delayed or unavailable data, never
   invented scores. Details: `guide/SPORTS.md`.
 
+## Lahza Reels (2026-11-07)
+* `reels.html`: full-screen swipeable YouTube Shorts from 21 verified news and sports publishers (Arabic and English),
+  played in YouTube's official privacy-enhanced embed, one at a time; filters, captions, share, related Lahza story.
+* Collected every 10 minutes by the database scheduler from the publishers' free public Shorts feeds (metadata only,
+  14-day retention). Details: `guide/REELS.md`.
+
 ## Sections
 World · Politics · Economy & Business · Tech & AI · Health & Science · Environment & Climate · Arab world ·
 Palestine · Jordan · Sports · Weather · Security & Crime · Education · Arts & Culture (world first; no country is pinned).
@@ -77,4 +83,5 @@ secondary tag: a strike in Gaza stays under Palestine and is also tagged *securi
 PGHOST=/path PGPORT=5432 tests/run-sql-tests.sh
 node tests/ui/smoke.mjs . /tmp/shots
 node tests/ui/sports-smoke.mjs . /tmp/shots
+node tests/ui/reels-smoke.mjs . /tmp/shots
 ```

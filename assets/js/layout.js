@@ -25,6 +25,7 @@ export const ICONS = {
   tv: () => svg('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="m8 2 4 4 4-4"/>'),
   up: () => svg('<path d="m6 14 6-6 6 6"/>'),
   globe: () => svg('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
+  reels: () => svg('<rect x="6" y="2" width="12" height="20" rx="3"/><path d="m10 9 5 3-5 3z"/>'),
   ball: () => svg('<circle cx="12" cy="12" r="9"/><path d="m12 7 4 3-1.5 4.5h-5L8 10z"/><path d="M12 7V3M16 10l4-1.5M14.5 14.5 17 18M9.5 14.5 7 18M8 10 4 8.5"/>'),
 };
 
@@ -88,6 +89,7 @@ export function renderChrome({ active = "home" } = {}) {
       h("span", { class: "push" },
         h("a", { href: "live.html" }, L("البث المباشر", "Live TV")),
         h("a", { href: "sports.html" }, L("النتائج المباشرة", "Live scores")),
+        h("a", { href: "reels.html", class: "hide-sm" }, L("ريلز", "Reels")),
         h("a", { href: "sources.html", class: "hide-sm" }, L("المصادر", "Sources")),
         h("button", { type: "button", class: "linklike", lang: EN ? "ar" : "en", style: "border:0;background:none;padding:0;cursor:pointer;color:var(--ink-2);font:inherit;font-weight:700", onclick: () => setLang(EN ? "ar" : "en") }, EN ? "العربية" : "English"),
         h("button", { type: "button", class: "linklike", style: "border:0;background:none;padding:0;cursor:pointer;color:var(--ink-2);font:inherit", onclick: settingsDialog }, L("حجم الخط والإعدادات", "Text size & settings")))));
@@ -115,6 +117,7 @@ export function renderChrome({ active = "home" } = {}) {
       h("a", { href: "breaking.html", class: "breaking-link", "aria-current": active === "breaking" ? "page" : null }, L("عاجل عالمي", "Global breaking")),
       h("a", { href: "live.html", class: "live-link", "aria-current": active === "live" ? "page" : null }, L("بث مباشر", "Live TV")),
       h("a", { href: "sports.html", class: "sports-link", "aria-current": active === "sports" ? "page" : null }, L("المركز الرياضي", "Sports Centre")),
+      h("a", { href: "reels.html", class: "reels-link" }, L("ريلز", "Reels")),
       CATEGORIES.map(([slug, name]) => h("a", { href: `index.html?cat=${slug}`, "aria-current": cat === slug ? "page" : null, dataset: { cat: slug } },
         h("span", { class: "dot", style: `background:var(--c-${slug})`, "aria-hidden": "true" }), name))));
 
@@ -131,6 +134,7 @@ export function renderChrome({ active = "home" } = {}) {
             h("li", {}, h("a", { href: "breaking.html" }, L("الأخبار العاجلة العالمية", "Global breaking news"))),
             h("li", {}, h("a", { href: "live.html" }, L("البث المباشر", "Live TV"))),
             h("li", {}, h("a", { href: "sports.html" }, L("المركز الرياضي والنتائج المباشرة", "Sports centre & live scores"))),
+            h("li", {}, h("a", { href: "reels.html" }, L("لحظة ريلز: فيديوهات قصيرة", "Lahza Reels: short videos"))),
             h("li", {}, h("a", { href: "sources.html" }, L("المصادر ومنهجية العمل", "Sources & methodology"))),
             h("li", {}, h("button", { type: "button", style: "border:0;background:none;padding:0;cursor:pointer;color:inherit;font:inherit", onclick: settingsDialog }, L("إعدادات القراءة", "Reading settings"))),
             h("li", {}, h("a", { href: "admin.html" }, L("دخول المحررين", "Editors")))))),
@@ -140,7 +144,7 @@ export function renderChrome({ active = "home" } = {}) {
     h("a", { href: "index.html", "aria-current": active === "home" && !cat && !q ? "page" : null }, ICONS.home(), L("الرئيسية", "Home")),
     h("a", { href: "breaking.html", "aria-current": active === "breaking" ? "page" : null }, ICONS.bolt(), L("عاجل", "Breaking")),
     h("a", { href: "live.html", class: "live-ic", "aria-current": active === "live" ? "page" : null }, ICONS.tv(), L("بث مباشر", "Live")),
-    h("button", { type: "button", onclick: () => { const box = document.getElementById("search-mobile"); box.classList.add("open"); scrollTo({ top: 0 }); box.querySelector("input")?.focus(); } }, ICONS.search(), L("بحث", "Search")),
+    h("a", { href: "reels.html" }, ICONS.reels(), L("ريلز", "Reels")),
     h("a", { href: "sports.html", "aria-current": active === "sports" ? "page" : null }, ICONS.ball(), L("رياضة", "Sports")));
 
   const toTop = h("button", { class: "to-top", type: "button", "aria-label": L("العودة للأعلى", "Back to top"), onclick: () => scrollTo({ top: 0, behavior: "smooth" }) }, ICONS.up());
