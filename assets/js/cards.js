@@ -1,5 +1,5 @@
 // Article card rendering (shared by home, search and breaking pages).
-import { h, CAT_NAME, time, ago, isToday, shortDate, verificationChip, srcName } from "./common.js";
+import { h, CAT_NAME, time, ago, isToday, shortDate, verificationChip, srcName, summaryOf } from "./common.js";
 import { EN, L, titleOf, titleDir, flag, countryName, isCountry } from "./i18n.js";
 
 const placeChip = (a) => (isCountry(a.countries?.[0]) ? h("a", { class: "chip place-chip", href: `index.html?country=${a.countries[0]}` }, flag(a.countries[0]), " ", countryName(a.countries[0])) : null);
@@ -23,7 +23,7 @@ export function card(a, src, { clusterSize = 1, isNew = false } = {}) {
         !EN && a.language !== "ar" && !a.translated ? h("span", { class: "chip lang" }, a.language === "fr" ? "بالفرنسية" : "بالإنجليزية") : null),
       h("h3", { dir: titleDir(a) }, h("a", { href: articleLink(a) }, titleOf(a))),
       // English edition: the excerpt is shown only when it is in English (the original, not our Arabic translation).
-      a.summary && (!EN || !a.translated) ? h("p", { dir: titleDir(a) }, a.summary) : null,
+      summaryOf(a) ? h("p", { dir: titleDir(a) }, summaryOf(a)) : null,
       h("div", { class: "meta-row" },
         h("span", { class: "src" }, srcName(src) || L("مصدر", "Source")),
         clusterSize > 1 ? h("span", { class: "more-src" }, EN ? `+ ${clusterSize - 1} more source${clusterSize > 2 ? "s" : ""}` : `+ ${clusterSize - 1} ${clusterSize - 1 === 1 ? "مصدر آخر" : clusterSize - 1 === 2 ? "مصدران آخران" : "مصادر أخرى"}`) : null)),
@@ -48,7 +48,7 @@ export function leadBlock(items, sources, clusterSizes) {
         : null,
       a_breaking(main) ? h("span", { class: "chip breaking" }, L("عاجل", "Breaking")) : null,
       h("h3", { dir: titleDir(main) }, h("a", { href: articleLink(main) }, titleOf(main))),
-      main.summary && (!EN || !main.translated) ? h("p", { dir: titleDir(main) }, main.summary) : null,
+      summaryOf(main) ? h("p", { dir: titleDir(main) }, summaryOf(main)) : null,
       meta(main)),
     h("div", { class: "lead-side" }, rest.map((a) => h("article", {},
       h("div", {}, h("h3", { dir: titleDir(a) }, h("a", { href: articleLink(a) }, titleOf(a))), meta(a)),
@@ -65,7 +65,7 @@ export function sectionBlock(slug, items, sources) {
     h("div", { class: "sec-head" }, h("h2", {}, CAT_NAME[slug]), h("a", { href: `index.html?cat=${slug}` }, L("المزيد ←", "More →"))),
     h("div", { class: "sec-top" + (img ? "" : " noimg") },
       h("div", {}, h("h3", { dir: titleDir(top) }, h("a", { href: articleLink(top) }, titleOf(top))),
-        top.summary && (!EN || !top.translated) ? h("p", { dir: titleDir(top) }, top.summary) : null,
+        summaryOf(top) ? h("p", { dir: titleDir(top) }, summaryOf(top)) : null,
         h("div", { class: "meta-row" }, h("span", { class: "src" }, srcName(sources.get(top.source_id))), h("span", { class: "num" }, ago(top.published_at)))),
       img ? h("img", { src: top.image_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => { e.target.parentElement.classList.add("noimg"); e.target.remove(); } }) : null),
     h("ul", {}, rest.slice(0, 3).map((a) => h("li", {}, h("span", { class: "t num" }, time(a.published_at)), h("a", { href: articleLink(a), dir: titleDir(a) }, titleOf(a))))));

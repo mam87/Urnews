@@ -196,7 +196,7 @@ select pg_temp.ok((select value::text from public.news_settings where key = 'sch
 select pg_temp.ok((select min(min_interval_minutes) from public.news_sources) >= 1, 'per-source intervals compatible with a 1-minute scheduler');
 select pg_temp.ok((public.news_scheduler_status() ->> 'next_ingest_at')::timestamptz between now() and now() + interval '1 minute', 'next scheduled ingestion is within a minute');
 select pg_temp.ok((select count(*) from public.news_categories where slug in ('environment','education','security','entertainment')) = 4, 'four new sections exist');
-select pg_temp.ok((select count(*) from public.news_categories) = 14, 'no duplicate sections (14 = 10 existing + 4 new)');
+select pg_temp.ok((select count(*) from public.news_categories) = 17, 'no duplicate sections (17 = 14 + science, nature, opinion)');
 set role anon;
 select pg_temp.fails($$select public.news_scheduler_status()$$, 'anon cannot read scheduler internals');
 select pg_temp.fails($$select public.news_admin_stats()$$, 'anon cannot read admin stats');

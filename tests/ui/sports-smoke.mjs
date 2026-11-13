@@ -133,7 +133,8 @@ const noOverflow = (page) => page.evaluate(() => document.documentElement.scroll
   await page.click("text=كل المباريات");
   await until(page, () => document.querySelectorAll(".mlist .mgroup").length === 3, 8000);
   ok(true, "'all matches' reveals the minor competition");
-  await page.click("text=المباشر فقط");
+  ok(await page.$$eval(".mfam > h2, .mfam > summary", (x) => x.length >= 1), "matches organised under competition families");
+  await page.click(".sp-status [data-show='live']");
   await until(page, () => document.querySelectorAll(".mlist .mrow").length === 1, 8000);
   ok(true, "live-only filter leaves one match");
   await page.waitForSelector(".sp-news .feed li");

@@ -220,5 +220,5 @@ reset role;
 -- scheduler jobs exist; generation job only calls out while enabled
 select pg_temp.ok((select count(*) from cron.job where jobname in ('news-stories-publish', 'news-stories-generate')) = 2, 'story cron jobs scheduled');
 select pg_temp.ok((select command like '%story_enabled%' from cron.job where jobname = 'news-stories-generate'), 'generation job is gated on story_enabled');
-select pg_temp.ok((select count(*) from cron.job where jobname like 'news-%') = 6, 'existing jobs untouched');
+select pg_temp.ok((select count(*) from cron.job where jobname in ('news-ingest', 'news-watchdog', 'news-retention', 'news-cron-cleanup')) = 4, 'existing jobs untouched');
 select 'ALL STORY TESTS PASSED' as result;

@@ -1,6 +1,6 @@
 // Global breaking news: worldwide events ranked 0-100 (any country), region/country filters,
 // the wider top-ranked list, and the 48-hour breaking timeline. Live-updating.
-import { sb, h, configured, loadSources, friendlyError, notConfiguredState, time, date, ammanDay, verificationChip, CAT_NAME, srcName } from "./common.js";
+import { sb, h, configured, loadSources, friendlyError, notConfiguredState, time, date, ammanDay, verificationChip, CAT_NAME, srcName, summaryOf } from "./common.js";
 import { renderChrome, fetchStatus } from "./layout.js";
 import { Live } from "./live.js";
 import { EN, L, REGIONS, REGION_NAME, countryName, flag, isCountry, langFilter, titleOf, titleDir } from "./i18n.js";
@@ -66,7 +66,7 @@ function methodology() {
 async function loadEvents() {
   const [breaking, top] = await Promise.all([
     fetchGlobalEvents({ breakingOnly: true, region, country, limit: 12 }),
-    fetchGlobalEvents({ region, country, limit: 30 }),
+    fetchGlobalEvents({ region, country, limit: 30, ownLang: true }),
   ]);
   const key = JSON.stringify([breaking, top].map((l) => l.map((e) => [e.key, e.score, e.status, e.report_count])));
   if (key === lastKey) return;
@@ -109,7 +109,7 @@ async function loadTimeline() {
       h("span", { class: "tl-dot", "aria-hidden": "true" }),
       h("div", {},
         h("h3", { dir: titleDir(a) }, h("a", { href: `article.html?id=${a.id}` }, titleOf(a))),
-        !EN && a.summary ? h("p", { class: "note", style: "font-size:14px;margin:0" }, a.summary) : null,
+        !EN && summaryOf(a) ? h("p", { class: "note", style: "font-size:14px;margin:0" }, summaryOf(a)) : null,
         h("div", { class: "meta-row" },
           c ? h("span", { class: "chip place-chip" }, flag(c), " ", countryName(c)) : null,
           h("span", { class: "src" }, srcName(sources.get(a.source_id))), h("span", { class: "chip cat" }, CAT_NAME[a.category] || ""), verificationChip(a.verification)))));

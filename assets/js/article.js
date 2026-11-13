@@ -1,5 +1,5 @@
 // Article page: headline, labelled summary, attribution, link to original, related coverage.
-import { sb, h, ARTICLE_COLS, CAT_NAME, VERIFICATION, SUMMARY_KIND, configured, loadSources, friendlyError, notConfiguredState, full, ago, verificationChip, toast } from "./common.js";
+import { sb, h, ARTICLE_COLS, CAT_NAME, VERIFICATION, SUMMARY_KIND, configured, loadSources, friendlyError, notConfiguredState, full, ago, verificationChip, toast, summaryOf } from "./common.js";
 import { renderChrome, fetchStatus, ICONS } from "./layout.js";
 import { EN, L, titleOf, titleDir, flag, countryName, isCountry, REGION_NAME } from "./i18n.js";
 import { Live } from "./live.js";
@@ -27,7 +27,7 @@ async function render() {
   const src = sources.get(a.source_id);
   const head = titleOf(a);
   document.title = `${head} — ${L("لحظة", "Lahza")}`;
-  document.querySelector('meta[name="description"]')?.setAttribute("content", (!EN && a.summary) || head);
+  document.querySelector('meta[name="description"]')?.setAttribute("content", (!EN && summaryOf(a)) || head);
 
   let related = [];
   if (a.cluster_id) {
@@ -45,7 +45,7 @@ async function render() {
   const dir = titleDir(a);
   const srcName = (EN ? src?.name_en || src?.name_ar : src?.name_ar) || L("المصدر", "the source");
   // English edition shows the publisher's English excerpt, never our Arabic translation of it.
-  const summary = EN && a.translated ? null : a.summary;
+  const summary = summaryOf(a);
 
   const share = async () => {
     const data = { title: head, url: location.href };
@@ -87,7 +87,7 @@ async function render() {
       related.map((r) => h("div", { class: "item" },
         h("div", { class: "who" }, h("b", {}, (EN ? sources.get(r.source_id)?.name_en : null) || sources.get(r.source_id)?.name_ar || ""), h("span", { class: "num" }, full(r.published_at)), verificationChip(r.verification)),
         h("h3", { dir: titleDir(r) }, h("a", { href: `article.html?id=${r.id}` }, titleOf(r))),
-        r.summary && (!EN || !r.translated) ? h("p", { dir: titleDir(r) }, r.summary) : null,
+        summaryOf(r) ? h("p", { dir: titleDir(r) }, summaryOf(r)) : null,
         h("a", { class: "note", href: r.url, target: "_blank", rel: "noopener noreferrer nofollow" }, L("الخبر لدى ", "Story at ") + ((EN ? sources.get(r.source_id)?.name_en : null) || sources.get(r.source_id)?.name_ar || L("المصدر", "the source")) + " ↗")))) : null,
     h("div", { class: "notice" + (a.verification === "allegation" || a.verification === "developing" ? " warn" : "") },
       h("b", {}, v.label + ": "), v.hint + ". ",

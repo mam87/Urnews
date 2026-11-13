@@ -8,7 +8,7 @@ import { EN, L, langFilter } from "./i18n.js";
 import { card } from "./cards.js";
 import { sports, ATTRIBUTION } from "./sports-data.js";
 import { adSlot, mount } from "./monetize.js";
-import { SPORTS, COMPETITIONS, COMP_BY_SLUG, COMP_BY_NAME, teamAr, teamAliases } from "./sports-names.js";
+import { SPORTS, COMPETITIONS, COMP_GROUPS, COMP_BY_SLUG, COMP_BY_NAME, teamAr, teamAliases, compAr, phraseAr } from "./sports-names.js";
 
 const chrome = renderChrome({ active: "sports" });
 const root = document.getElementById("app");
@@ -22,7 +22,9 @@ const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || "");
 // ---------- small helpers ----------
 const tName = (n) => (EN ? n : teamAr(n) || n);
 const sportMeta = (s) => SPORTS.find(([k]) => k === s) || SPORTS[0];
-const compName = (nameOrSlug) => { const c = COMP_BY_SLUG[nameOrSlug] || COMP_BY_NAME[String(nameOrSlug || "").toLowerCase()]; return c ? (EN ? c[3] : c[2]) : nameOrSlug; };
+const compName = (nameOrSlug) => { const c = COMP_BY_SLUG[nameOrSlug] || COMP_BY_NAME[String(nameOrSlug || "").toLowerCase()]; return c ? (EN ? c[3] : c[2]) : EN ? nameOrSlug : compAr(nameOrSlug) || nameOrSlug; };
+/** The provider's short English phrases (status, group, round, promotion label) in the page language. */
+const ph = (s) => (EN ? s : phraseAr(s));
 const url = (o) => "sports.html?" + new URLSearchParams(Object.entries({ sport: SPORT, ...o }).filter(([, v]) => v !== null && v !== undefined && v !== "")).toString();
 const logo = (src, cls = "lg") => src ? h("img", { class: cls, src, alt: "", loading: "lazy", decoding: "async", referrerpolicy: "no-referrer", width: "24", height: "24", onerror: (e) => e.target.remove() }) : h("span", { class: cls + " lg-empty", "aria-hidden": "true" });
 const shiftDay = (d, n) => { const t = new Date(d + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
@@ -64,39 +66,68 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 
 // ---------- match rows ----------
 function statusCell(m) {
-  if (m.status === "live") return h("span", { class: "st live" }, h("span", { class: "live-dot" }), m.minute != null ? `${m.minute}'` : (m.statusText || L("مباشر", "Live")));
+  if (m.status === "live") return h("span", { class: "st live" }, h("span", { class: "live-dot" }), m.minute != null ? `${m.minute}'` : (ph(m.statusText) || L("مباشر", "Live")));
   if (m.status === "finished") return h("span", { class: "st fin" }, L("انتهت", "FT"));
   if (m.status === "upcoming") return h("span", { class: "st up num" }, m.time ? time(m.time) : "—");
-  return h("span", { class: "st" }, m.statusText || "—");
+  return h("span", { class: "st" }, ph(m.statusText) || "—");
 }
 const score = (v) => (v === null || v === undefined ? "–" : String(v));
 
+/** One match: status / kick-off on the leading edge, then the two teams one above the other with their scores. */
 function matchRow(m) {
   const scored = m.homeScore !== null && m.awayScore !== null && m.status !== "upcoming";
-  const win = scored ? (m.homeScore > m.awayScore ? "h" : m.awayScore > m.homeScore ? "a" : "") : "";
+  const win = scored && m.status === "finished" ? (m.homeScore > m.awayScore ? "h" : m.awayScore > m.homeScore ? "a" : "") : "";
+  const side = (cls, name, lg, sc, w) => h("span", { class: "tm " + cls + (w ? " win" : "") }, logo(lg), h("span", { class: "nm" }, tName(name)),
+    h("b", { class: "sc num" + (m.status === "live" ? " live" : "") }, scored ? score(sc) : ""));
   const inner = [
     statusCell(m),
-    h("span", { class: "tm home" + (win === "h" ? " win" : "") }, h("span", { class: "nm" }, tName(m.home)), logo(m.homeLogo)),
-    h("span", { class: "sc num" + (m.status === "live" ? " live" : "") }, scored ? `${score(m.homeScore)} - ${score(m.awayScore)}` : L("ضد", "v")),
-    h("span", { class: "tm away" + (win === "a" ? " win" : "") }, logo(m.awayLogo), h("span", { class: "nm" }, tName(m.away))),
+    h("span", { class: "teams" }, side("home", m.home, m.homeLogo, m.homeScore, win === "h"), side("away", m.away, m.awayLogo, m.awayScore, win === "a")),
   ];
-  return m.slug ? h("a", { class: "mrow", href: url({ match: m.slug }) }, inner) : h("div", { class: "mrow" }, inner);
+  const label = `${tName(m.home)} ${scored ? score(m.homeScore) + " - " + score(m.awayScore) : L("ضد", "v")} ${tName(m.away)}`;
+  return m.slug ? h("a", { class: "mrow", href: url({ match: m.slug }), "aria-label": label, dataset: { status: m.status } }, inner)
+    : h("div", { class: "mrow", dataset: { status: m.status } }, inner);
 }
+
+const STATUS_ORDER = { live: 0, upcoming: 1, finished: 2 };
+const byKickoff = (a, b) => (STATUS_ORDER[a.status] ?? 3) - (STATUS_ORDER[b.status] ?? 3) || (a.time || "").localeCompare(b.time || "");
 
 function groupByComp(list) {
   const groups = new Map();
   for (const m of list) { const k = m.competition || L("أخرى", "Other"); if (!groups.has(k)) groups.set(k, { name: k, logo: m.competitionLogo, items: [] }); groups.get(k).items.push(m); }
   const order = (g) => { const c = COMP_BY_NAME[g.name.toLowerCase()]; return c ? COMPETITIONS.indexOf(c) : 100; };
-  return [...groups.values()].sort((a, b) => order(a) - order(b) || b.items.some((m) => m.status === "live") - a.items.some((m) => m.status === "live") || a.name.localeCompare(b.name));
+  return [...groups.values()].sort((a, b) => order(a) - order(b) || b.items.some((m) => m.status === "live") - a.items.some((m) => m.status === "live") || compName(a.name).localeCompare(compName(b.name), EN ? "en" : "ar"));
 }
 
+/** One competition card: name (linked when we feature it), match count, its matches (live first, then by kick-off). */
+function compCard(g) {
+  const c = COMP_BY_NAME[g.name.toLowerCase()];
+  const live = g.items.filter((m) => m.status === "live").length;
+  return h("section", { class: "mgroup" },
+    h("h3", {}, logo(g.logo, "lg sm"), c ? h("a", { href: url({ comp: c[0] }) }, compName(c[0])) : compName(g.name),
+      live ? h("span", { class: "chip breaking" }, L(`${live} مباشر`, `${live} live`)) : null,
+      h("span", { class: "count num" }, g.items.length)),
+    g.items.sort(byKickoff).map(matchRow));
+}
+
+/** The day's matches organised by family: national teams, European club competitions, top leagues, Arab leagues,
+ *  then every other competition (folded away when there are many). */
 function matchList(list) {
-  return h("div", { class: "mlist" }, groupByComp(list).map((g) => {
-    const c = COMP_BY_NAME[g.name.toLowerCase()];
-    return h("section", { class: "mgroup" },
-      h("h3", {}, logo(g.logo, "lg sm"), c ? h("a", { href: url({ comp: c[0] }) }, compName(c[0])) : g.name, h("span", { class: "count num" }, g.items.length)),
-      g.items.sort((a, b) => (a.time || "").localeCompare(b.time || "")).map(matchRow));
-  }));
+  const groups = groupByComp(list);
+  const famOf = (g) => COMP_BY_NAME[g.name.toLowerCase()]?.[6] || "other";
+  const blocks = [];
+  for (const [key, ar, en] of COMP_GROUPS) {
+    const gs = groups.filter((g) => famOf(g) === key);
+    if (gs.length) blocks.push(h("section", { class: "mfam", dataset: { fam: key } }, h("h2", {}, EN ? en : ar, h("span", { class: "count num" }, gs.reduce((n, g) => n + g.items.length, 0))), gs.map(compCard)));
+  }
+  const rest = groups.filter((g) => famOf(g) === "other");
+  if (rest.length) {
+    const n = rest.reduce((k, g) => k + g.items.length, 0);
+    const cards = rest.map(compCard);
+    blocks.push(blocks.length && rest.length > 4
+      ? h("details", { class: "mfam other", open: rest.some((g) => g.items.some((m) => m.status === "live")) }, h("summary", {}, L("بطولات أخرى", "Other competitions"), h("span", { class: "count num" }, n)), cards)
+      : h("section", { class: "mfam other" }, blocks.length ? h("h2", {}, L("بطولات أخرى", "Other competitions"), h("span", { class: "count num" }, n)) : null, cards));
+  }
+  return h("div", { class: "mlist" }, blocks);
 }
 
 /** Matches for one Amman calendar day: the provider's days are UTC, so two UTC days are merged and filtered. */
@@ -148,8 +179,9 @@ function header(sub) {
     h("div", { class: "section-head" }, h("h1", {}, h("a", { href: url({}) }, L("المركز الرياضي", "Sports Centre"))), sub ? h("span", { class: "meta" }, sub) : null),
     h("nav", { class: "sp-tabs", "aria-label": L("الرياضات", "Sports") }, SPORTS.map(([s, ar, en, ic]) =>
       h("a", { href: "sports.html?sport=" + s, "aria-current": s === SPORT ? "page" : null }, ic, " ", EN ? en : ar))),
-    SPORT === "football" ? h("nav", { class: "sp-chips", "aria-label": L("البطولات", "Competitions") }, COMPETITIONS.map((c) =>
-      h("a", { href: url({ comp: c[0] }), "aria-current": P.get("comp") === c[0] ? "page" : null }, EN ? c[3] : c[2]))) : null,
+    SPORT === "football" ? h("nav", { class: "sp-chips", "aria-label": L("البطولات", "Competitions") }, COMP_GROUPS.flatMap(([key, ar, en]) => [
+      h("span", { class: "sp-chip-group" }, EN ? en : ar),
+      ...COMPETITIONS.filter((c) => c[6] === key).map((c) => h("a", { href: url({ comp: c[0] }), "aria-current": P.get("comp") === c[0] ? "page" : null }, EN ? c[3] : c[2]))])) : null,
     form);
 }
 
@@ -157,7 +189,8 @@ function header(sub) {
 async function viewDay() {
   let day = isDate(P.get("date")) ? P.get("date") : today();
   let mode = SPORT === "football" ? (P.get("all") === "1" ? "all" : "top") : "all";
-  let liveOnly = false;
+  let show = ["live", "upcoming", "finished"].includes(P.get("show")) ? P.get("show") : "all";
+  let counts = { all: 0, live: 0, upcoming: 0, finished: 0 };
   const body = h("div", {});
   const fresh = h("div", {});
   const controls = h("div", { class: "sp-controls" });
@@ -170,7 +203,10 @@ async function viewDay() {
       SPORT === "football" ? h("div", { class: "seg", role: "group" },
         [["top", L("البطولات الكبرى", "Major competitions")], ["all", L("كل المباريات", "All matches")]].map(([v, t]) =>
           h("button", { type: "button", "aria-pressed": String(mode === v), onclick: () => { mode = v; drawControls(); load(); } }, t))) : null,
-      h("button", { class: "btn", type: "button", "aria-pressed": String(liveOnly), onclick: () => { liveOnly = !liveOnly; drawControls(); load(); } }, h("span", { class: "live-dot" }), L("المباشر فقط", "Live only"))));
+      h("div", { class: "seg sp-status", role: "group", "aria-label": L("حالة المباراة", "Match status") },
+        [["all", L("الكل", "All")], ["live", L("مباشر", "Live")], ["upcoming", L("القادمة", "Upcoming")], ["finished", L("المنتهية", "Finished")]].map(([v, t]) =>
+          h("button", { type: "button", dataset: { show: v }, "aria-pressed": String(show === v), onclick: () => { show = v; drawControls(); load(); } },
+            v === "live" ? h("span", { class: "live-dot" }) : null, t, h("span", { class: "n num" }, counts[v]))))));
   drawControls();
 
   async function load(force = false) {
@@ -180,11 +216,16 @@ async function viewDay() {
     if (!res.data) { put(body, errorState(res, () => load(true))); poll(load, day === today() ? 120e3 : 0); return; }
     let list = res.data;
     if (mode === "top") list = list.filter((m) => COMP_BY_NAME[(m.competition || "").toLowerCase()]);
-    if (liveOnly) list = list.filter((m) => m.status === "live");
+    counts = { all: list.length, live: 0, upcoming: 0, finished: 0 };
+    for (const m of list) if (m.status in counts) counts[m.status]++;
+    drawControls();
+    if (show !== "all") list = list.filter((m) => m.status === show);
     const live = res.data.some((m) => m.status === "live");
     if (!list.length) {
       put(body, h("div", { class: "state" },
-        h("h3", {}, liveOnly ? L("لا مباريات مباشرة الآن", "No live matches right now") : L("لا مباريات في هذا اليوم", "No matches on this day")),
+        h("h3", {}, show === "live" ? L("لا مباريات مباشرة الآن", "No live matches right now") : show === "upcoming" ? L("لا مباريات قادمة في هذا اليوم", "No upcoming matches on this day")
+          : show === "finished" ? L("لا مباريات منتهية في هذا اليوم بعد", "No finished matches on this day yet") : L("لا مباريات في هذا اليوم", "No matches on this day")),
+        show !== "all" && counts.all ? h("button", { class: "btn", type: "button", onclick: () => { show = "all"; drawControls(); load(); } }, L(`عرض كل مباريات اليوم (${counts.all})`, `Show all of the day's matches (${counts.all})`)) : null,
         mode === "top" && res.data.length ? h("button", { class: "btn", type: "button", onclick: () => { mode = "all"; drawControls(); load(); } }, L(`عرض كل المباريات (${res.data.length})`, `Show all matches (${res.data.length})`)) : null));
     } else put(body, matchList(list));
     // live matches: every 30 s; today otherwise every 5 min; other days: no polling
@@ -258,7 +299,7 @@ function standingsTable(t) {
   const rows = t.rows || [];
   const promos = new Map(rows.filter((r) => r.promo_name).map((r) => [r.promo_name, r.promo_color]));
   return h("div", { class: "sp-table" },
-    t.group ? h("h3", {}, t.group) : null,
+    t.group ? h("h3", {}, ph(t.group)) : null,
     h("div", { class: "table-wrap" }, h("table", { class: "standings" },
       h("thead", {}, h("tr", {}, h("th", {}, "#"), h("th", {}, L("الفريق", "Team")), h("th", {}, L("لعب", "P")), h("th", { class: "sp-opt" }, L("فاز", "W")), h("th", { class: "sp-opt" }, L("تعادل", "D")), h("th", { class: "sp-opt" }, L("خسر", "L")), h("th", { class: "sp-opt" }, L("الأهداف", "Goals")), h("th", {}, L("الفارق", "GD")), h("th", {}, L("النقاط", "Pts")))),
       h("tbody", {}, rows.map((r) => h("tr", {},
@@ -266,7 +307,7 @@ function standingsTable(t) {
         h("td", {}, h("a", { class: "tcell", href: url({ team: r.team_slug }) }, logo(r.team_logo), tName(r.team))),
         h("td", { class: "num" }, r.p), h("td", { class: "num sp-opt" }, r.w), h("td", { class: "num sp-opt" }, r.d), h("td", { class: "num sp-opt" }, r.l),
         h("td", { class: "num sp-opt", dir: "ltr" }, `${r.gf}:${r.ga}`), h("td", { class: "num", dir: "ltr" }, r.gd > 0 ? "+" + r.gd : r.gd), h("td", { class: "num pts" }, r.pts)))))),
-    promos.size ? h("ul", { class: "sp-legend" }, [...promos].map(([n, col]) => h("li", {}, h("span", { style: `background:${/^#[0-9a-f]{3,8}$/i.test(col) ? col : "transparent"}` }), n))) : null);
+    promos.size ? h("ul", { class: "sp-legend" }, [...promos].map(([n, col]) => h("li", {}, h("span", { style: `background:${/^#[0-9a-f]{3,8}$/i.test(col) ? col : "transparent"}` }), ph(n)))) : null);
 }
 
 function scorersTable(list, tab) {
@@ -283,7 +324,7 @@ function scorersTable(list, tab) {
 function bracketView(b) {
   const rounds = b.rounds || [];
   if (!rounds.length) return h("div", { class: "state" }, L("لا أدوار إقصائية منشورة بعد.", "No knockout rounds published yet."));
-  return h("div", { class: "sp-bracket" }, rounds.map((r) => h("section", { class: "mgroup" }, h("h3", {}, r.name),
+  return h("div", { class: "sp-bracket" }, rounds.map((r) => h("section", { class: "mgroup" }, h("h3", {}, ph(r.name)),
     (r.matchups || []).map((m) => matchRow({ home: m.home, away: m.away, homeLogo: m.home_logo, awayLogo: m.away_logo, homeScore: m.home_score ?? null, awayScore: m.away_score ?? null, status: m.home_score != null ? "finished" : "upcoming", statusText: m.status || "", time: null, slug: null })))));
 }
 
@@ -315,7 +356,7 @@ async function viewMatch(slug) {
     document.title = `${tName(m.home)} ${score(m.homeScore)}-${score(m.awayScore)} ${tName(m.away)} — ${L("لحظة", "Lahza")}`;
     const c = COMP_BY_NAME[(m.competition || "").toLowerCase()];
     const board = h("section", { class: "scoreboard" + (m.status === "live" ? " is-live" : "") },
-      h("div", { class: "sb-comp" }, logo(m.competitionLogo, "lg sm"), c ? h("a", { href: url({ comp: c[0] }) }, compName(c[0])) : m.competition,
+      h("div", { class: "sb-comp" }, logo(m.competitionLogo, "lg sm"), c ? h("a", { href: url({ comp: c[0] }) }, compName(c[0])) : compName(m.competition),
         m.time ? h("span", { class: "num" }, " · ", longDate(m.time), " · ", time(m.time)) : null),
       h("div", { class: "sb-main" },
         h("div", { class: "sb-team" }, logo(m.homeLogo, "lg xl"), h("b", {}, tName(m.home))),
@@ -402,12 +443,12 @@ async function viewSearch(q) {
   const res = await sports.search({ sport: SPORT, q });
   fresh.replaceChildren(freshness(res));
   if (!res.data) return put(body, errorState(res, () => location.reload()));
-  const grp = (title, items, link) => items?.length ? h("section", { class: "mgroup" }, h("h3", {}, title), items.map((x) => h("a", { class: "mrow simple", href: link(x) }, logo(x.logo), h("span", {}, tName(x.name))))) : null;
+  const grp = (title, items, link, name = tName) => items?.length ? h("section", { class: "mgroup" }, h("h3", {}, title), items.map((x) => h("a", { class: "mrow simple", href: link(x) }, logo(x.logo), h("span", {}, name(x.name))))) : null;
   const known = COMPETITIONS.filter((c) => [c[1], c[2], c[3]].some((n) => n.toLowerCase().includes(q.toLowerCase())));
   const out = [
     known.length ? h("section", { class: "mgroup" }, h("h3", {}, L("بطولات نغطيها", "Competitions we cover")), known.map((c) => h("a", { class: "mrow simple", href: url({ comp: c[0] }) }, h("span", {}, EN ? c[3] : c[2])))) : null,
     grp(L("فرق", "Teams"), res.data.teams, (x) => url({ team: x.slug })),
-    grp(L("بطولات", "Competitions"), res.data.competitions, (x) => url({ comp: x.slug })),
+    grp(L("بطولات", "Competitions"), res.data.competitions, (x) => url({ comp: x.slug }), compName),
     grp(L("لاعبون", "Players"), res.data.players, (x) => url({ player: x.slug })),
   ].filter(Boolean);
   put(body, ...(out.length ? out : [h("div", { class: "state" }, L("لا نتائج. جرّب الاسم بالإنجليزية، مثل Barcelona.", "No results. Try another spelling."))]));

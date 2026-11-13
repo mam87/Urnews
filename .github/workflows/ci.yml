@@ -26,10 +26,11 @@ jobs:
           (cd supabase/functions/news-ingest && deno check index.ts)
           (cd supabase/functions/news-notify && deno check index.ts)
           (cd supabase/functions/news-stories && deno check index.ts)
+          (cd supabase/functions/news-translate && deno check index.ts && deno test -A tests/)
       - name: Database tests (RLS, permissions, dedup, scheduler lease, alerts, search)
         env: { PGHOST: localhost, PGPORT: 5432, PGUSER: postgres, PGPASSWORD: postgres }
         run: |
           sudo apt-get install -y postgresql-client >/dev/null
           tests/run-sql-tests.sh | tee /tmp/out.txt
           ! grep -q "FAIL" /tmp/out.txt
-          test "$(grep -c '^  ok -' /tmp/out.txt)" -ge 190
+          test "$(grep -c '^  ok -' /tmp/out.txt)" -ge 215

@@ -44,3 +44,8 @@ insert into cron.job (jobname, schedule, command) values
   ('news-watchdog', '*/5 * * * *', ' select public.news_watchdog(); '),
   ('news-retention', '17 1 * * *', ' select public.news_purge_old(); '),
   ('news-cron-cleanup', '23 1 * * *', ' delete from cron.job_run_details where end_time < now() - interval ''3 days''; ');
+-- pg_net stand-in (requests are recorded, never sent; tests insert the responses they need)
+create schema if not exists net;
+create table if not exists net._http_response (id bigint primary key, status_code int, content text, error_msg text, timed_out boolean default false, created timestamptz default now());
+create sequence if not exists net.http_request_seq start 1;
+create or replace function net.http_get(url text, timeout_milliseconds int default 5000, headers jsonb default '{}') returns bigint language sql as $$ select nextval('net.http_request_seq') $$;

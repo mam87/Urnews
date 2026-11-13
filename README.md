@@ -74,8 +74,28 @@ running.
 * Labelled house-ad slots, sponsor label and a consent-based newsletter sign-up (CSV export in admin) — all off by
   default; see `guide/MONETIZATION.md`. Full implementation report: `guide/FINAL_REPORT.md`.
 
+## Platform update (2026-11-13)
+* **Sports:** UEFA Nations League, World Cup and Euro qualifiers added; the day list is organised by family (national teams,
+  European club competitions, top leagues, Arab leagues, others), with All / Live / Upcoming / Finished filters and stacked
+  match rows. National teams, ~250 clubs, ~90 competitions and the provider's status / group / round phrases are shown in Arabic.
+* **Weather:** `weather.html` + home panel for the reader's own place (device time zone on first visit, optional browser
+  location, search any city / region / country; up to 6 saved in the browser). Now, 24 hours, 7 days, world cities;
+  refreshed every 10 minutes (Open-Meteo forecast + geocoding, no key).
+* **Reels:** tap to pause, double-tap to like, press-and-hold, progress bar, action rail, For you / News / Sports / Liked tabs;
+  the Arabic edition shows Arabic videos by default (all languages in Sports).
+* **New sections:** Science & Space, Nature & Animals, Opinion & Analysis (migration 28: 14 feeds, section rules in a database
+  trigger, opinion never breaking). Edge Function `news-translate` translates their English headlines every 5 minutes from
+  the same daily AI budget.
+* **Trends:** `trends.html` — Google Trends "trending now" per country (28 countries, collected every 5 minutes by pg_cron +
+  pg_net into `news_trends`) plus the stories most newsrooms are covering; strip and panel on the home page.
+* **Untranslated text:** an Arabic headline is never shown with the publisher's English excerpt (fixed in
+  `news_set_translations` and in the UI); ranked events without a headline in the reader's language are held back.
+* **Theme:** one dark chrome (clocks strip, masthead, ticker, page navigation, footer) with gold accents in both themes;
+  phone bottom bar with a "More" sheet. UI tests: `tests/ui/pages-smoke.mjs` (weather, trends) added; pass the site
+  directory as an absolute path.
+
 ## Sections
-World · Politics · Economy & Business · Tech & AI · Health & Science · Environment & Climate · Arab world ·
+World · Politics · Economy & Business · Tech & AI · Health · Science & Space · Nature & Animals · Opinion & Analysis · Environment & Climate · Arab world ·
 Palestine · Jordan · Sports · Weather · Security & Crime · Education · Arts & Culture (world first; no country is pinned).
 "Breaking" is a flag on any article (ticker + `breaking.html`), not a separate section. Security is a
 secondary tag: a strike in Gaza stays under Palestine and is also tagged *security*.

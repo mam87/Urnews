@@ -243,7 +243,7 @@ for (const [name, vp] of [["mobile", { width: 390, height: 844 }], ["desktop", {
   // dark mode
   await page.evaluate(() => document.getElementById("theme-toggle").click());
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  check(bg === "rgb(14, 15, 18)", `${name}: dark mode applies (${bg})`);
+  check(bg === "rgb(10, 12, 17)", `${name}: dark mode applies (${bg})`);
   await page.screenshot({ path: `${outDir}/home-${name}-dark.png` });
   await page.evaluate(() => document.getElementById("theme-toggle").click());
 

@@ -91,17 +91,24 @@ async function open(q, { width = 390, height = 800, lang } = {}) {
   await page.click(".reel:nth-child(2) .act-cc");
   await until(page, () => document.querySelectorAll(".reel")[1].querySelector("iframe")?.src.includes("cc_load_policy=1"));
   ok(true, "captions reload the player with captions on");
-  await page.click(".reel:nth-child(2) .act-play");
-  ok(await page.$eval(".reel:nth-child(2)", (c) => c.dataset.state === "paused"), "pause");
+  await page.click(".reel:nth-child(2) .rgest", { position: { x: 120, y: 300 } });
+  await until(page, () => document.querySelectorAll(".reel")[1].dataset.state === "paused");
+  ok(true, "tap pauses");
+  await page.click(".reel:nth-child(2) .rgest", { position: { x: 120, y: 300 } });
+  await until(page, () => document.querySelectorAll(".reel")[1].dataset.state === "playing");
+  ok(true, "tap again resumes");
+  await page.dblclick(".reel:nth-child(2) .rgest", { position: { x: 120, y: 300 } });
+  await until(page, () => document.querySelectorAll(".reel")[1].querySelector(".act-like").getAttribute("aria-pressed") === "true");
+  ok(await page.evaluate(() => JSON.parse(localStorage.getItem("lahza-reels-liked")).length === 1), "double-tap likes (kept in this browser)");
   // infinite load
   for (let i = 0; i < 14; i++) await page.$eval("#reels-feed", (f) => f.scrollBy(0, f.clientHeight));
-  await until(page, () => document.querySelectorAll(".reel").length === 21);
+  await until(page, () => document.querySelectorAll(".reel").length === 20);
   ok(queries.some((q) => q.includes("published_at=lt.")), "next page loaded with a time cursor");
   await page.$eval("#reels-feed", (f) => f.scrollTo(0, f.scrollHeight));
   await page.waitForSelector(".reels-state.end");
   ok(true, "end of feed state");
   // filter: sports
-  await page.click("text=رياضة");
+  await page.click(".rtab:nth-child(3)");
   await until(page, () => document.querySelectorAll(".reel").length === 1);
   ok(await page.$eval(".reel h2", (e) => e.textContent === "Goal of the day" && e.dir === "ltr"), "sports filter; English title shown LTR");
   ok(new URL(page.url()).searchParams.get("kind") === "sports", "filter kept in the URL");

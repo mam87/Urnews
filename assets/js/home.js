@@ -2,7 +2,9 @@
 import { sb, h, ARTICLE_COLS, CAT_NAME, configured, loadSources, friendlyError, notConfiguredState, store, ago } from "./common.js";
 import { fetchLatestStories, storyListItem } from "./stories.js";
 import { renderChrome, fetchStatus, ICONS } from "./layout.js";
-import { card, leadBlock, rankScore, sectionBlock } from "./cards.js";
+import { card, leadBlock, rankScore, sectionBlock, articleLink } from "./cards.js";
+import { titleOf, titleDir } from "./i18n.js";
+import { time as clockTime, srcName, CATEGORIES } from "./common.js";
 import { Live } from "./live.js";
 import { weatherPanel } from "./weather.js";
 import { EN, L, REGION_NAME, countryName, flag, isCountry, langFilter, inLang } from "./i18n.js";
@@ -10,6 +12,7 @@ import { fetchGlobalEvents, eventRow } from "./global.js";
 import { followButton } from "./saved.js";
 import { adSlot, newsletterBox, mount } from "./monetize.js";
 import { toast } from "./common.js";
+import { fetchTrends, guessGeo, geoLabel, volume, searchUrl, termDir } from "./trends-data.js";
 
 const params = new URLSearchParams(location.search);
 const cat = CAT_NAME[params.get("cat")] ? params.get("cat") : null;
@@ -67,6 +70,10 @@ const loadMoreBtn = h("button", { class: "btn", type: "button", onclick: () => l
 const loadMore_ = h("div", { class: "load-more", hidden: true }, loadMoreBtn);
 const leadSlot = h("div");
 const sectionsSlot = h("div");
+const trendSlot = h("div");     // strip of search trends above the lead story
+const featureSlot = h("div");   // science · nature · opinion
+const trendPanelList = h("ol", { class: "mini-list tr-mini" });
+const trendPanel = h("section", { class: "panel", hidden: true });
 const breakingPanel = h("ul", { class: "mini-list" });
 const statusPanel = h("div", { class: "src-status" });
 const storiesList = h("ul", { class: "mini-list" });
@@ -79,7 +86,9 @@ function layout() {
   root.replaceChildren(
     h("div", { class: "grid" },
       h("div", {},
+        q || cat || region || country ? null : trendSlot,
         q ? null : leadSlot,
+        q || cat || region || country ? null : featureSlot,
         q || cat || region || country ? null : sectionsSlot,
         h("div", { class: "section-head" }, h("h2", {}, title), metaEl,
           q ? null : h("div", { class: "tools" },
@@ -91,6 +100,7 @@ function layout() {
       h("aside", {},
         h("section", { class: "panel" }, h("h2", {}, h("span", { class: "chip breaking" }, L("عاجل", "Breaking")), L("عالمياً الآن", "worldwide now")), breakingPanel,
           h("a", { href: geoName ? `breaking.html?${region ? "region=" + region : "country=" + country}` : "breaking.html", class: "note" }, L("كل الأخبار العاجلة العالمية ←", "All global breaking news →"))),
+        q ? null : trendPanel,
         q ? null : storiesPanel,
         q ? null : weatherPanel(),
         h("section", { class: "panel" }, h("h2", {}, L("حالة المصادر", "Source status")), statusPanel,
@@ -180,7 +190,52 @@ async function loadLead() {
 }
 
 // World first: Jordan, Palestine and the Arab world are sections like any other, never pinned to the top.
-const SECTION_ORDER = ["world", "politics", "economy", "tech", "health", "environment", "arab", "palestine", "jordan", "sports", "security", "weather", "education", "entertainment"];
+const SECTION_ORDER = ["world", "politics", "economy", "tech", "health", "environment", "sports", "arab", "palestine", "jordan", "security", "weather", "education", "entertainment"];
+
+/** Search trends of the reader's country: a strip of terms above the lead story and a ranked side panel. */
+async function loadTrendsHome() {
+  if (q || cat || region || country) return;
+  try {
+    const { by } = await fetchTrends();
+    const geo = guessGeo([...by.keys()]);
+    const rows = (by.get(geo) || []).slice(0, 10);
+    if (!rows.length) { trendSlot.replaceChildren(); trendPanel.hidden = true; return; }
+    trendSlot.replaceChildren(h("nav", { class: "trend-strip", "aria-label": L("الأكثر بحثاً الآن", "Trending searches") },
+      h("a", { class: "ts-label", href: "trends.html" }, ICONS.trend(), L("ترند الآن", "Trending")),
+      h("div", { class: "ts-track" }, rows.map((r) => h("a", { href: searchUrl(r.title), dir: termDir(r.title) }, r.title)),
+        h("a", { class: "ts-more", href: "trends.html" }, L("كل الدول ←", "All countries →")))));
+    trendPanel.hidden = false;
+    trendPanel.replaceChildren(h("h2", {}, L("الأكثر بحثاً الآن", "Most searched now"), h("span", { class: "meta" }, geoLabel(geo))), trendPanelList,
+      h("a", { href: "trends.html", class: "note" }, L("ترند كل الدول وحديث غرف الأخبار ←", "Every country's trends & newsroom buzz →")));
+    trendPanelList.replaceChildren(...rows.slice(0, 7).map((r) => h("li", {}, h("a", { href: searchUrl(r.title), dir: termDir(r.title) }, r.title),
+      r.traffic ? h("span", { class: "t num" }, volume(r.traffic)) : null)));
+  } catch { trendSlot.replaceChildren(); trendPanel.hidden = true; }
+}
+
+/** Science & space, nature & animals, opinion & analysis: three columns with the newest pieces of each (last 3 days). */
+const FEATURES = ["science", "nature", "opinion"];
+async function loadFeatures() {
+  if (q || cat || region || country) return;
+  const since = new Date(Date.now() - 72 * 3600_000).toISOString();
+  const cols = "id,source_id,title,title_en,language,translated,category,published_at,image_url";
+  const lists = await Promise.all(FEATURES.map((c) => langFilter(sb.from("news_articles").select(cols).eq("status", "published").is("duplicate_of", null).eq("category", c).gt("published_at", since))
+    .order("published_at", { ascending: false }).limit(5).then(({ data }) => data || [], () => [])));
+  const name = Object.fromEntries(CATEGORIES);
+  const colsEl = FEATURES.map((c, i) => {
+    const items = lists[i]; if (!items.length) return null;
+    const [top, ...rest] = items;
+    const img = top.image_url && state.sources.get(top.source_id)?.allow_images;
+    return h("section", { class: "feat", dataset: { cat: c } },
+      h("div", { class: "feat-head" }, h("h2", {}, name[c]), h("a", { href: `index.html?cat=${c}` }, L("المزيد ←", "More →"))),
+      img ? h("a", { class: "feat-img", href: articleLink(top), tabindex: "-1", "aria-hidden": "true" }, h("img", { src: top.image_url, alt: "", loading: "lazy", referrerpolicy: "no-referrer", onerror: (e) => e.target.parentElement?.remove() })) : null,
+      h("h3", { dir: titleDir(top) }, h("a", { href: articleLink(top) }, titleOf(top))),
+      h("div", { class: "meta-row" }, h("span", { class: "src" }, srcName(state.sources.get(top.source_id))), h("span", { class: "num" }, ago(top.published_at))),
+      h("ul", {}, rest.slice(0, 3).map((a) => h("li", {}, h("a", { href: articleLink(a), dir: titleDir(a) }, titleOf(a)),
+        h("span", { class: "src" }, srcName(state.sources.get(a.source_id)), " · ", h("span", { class: "num" }, isTodayHome(a.published_at) ? clockTime(a.published_at) : ago(a.published_at))))))); 
+  }).filter(Boolean);
+  featureSlot.replaceChildren(...(colsEl.length ? [h("div", { class: "features" }, colsEl)] : []));
+}
+const isTodayHome = (d) => new Date(d).toDateString() === new Date().toDateString();
 async function loadSections() {
   const since = new Date(Date.now() - 24 * 3600_000).toISOString();
   const { data, error } = await langFilter(sb.from("news_articles").select("id,source_id,title,title_en,language,translated,summary,category,published_at,image_url,importance")
@@ -220,7 +275,7 @@ async function loadSide() {
   const now = new Date().toISOString();
   void now;
   const [events, status, stories] = await Promise.all([
-    fetchGlobalEvents({ breakingOnly: true, region, country, limit: 6 }).catch(() => []),
+    fetchGlobalEvents({ breakingOnly: true, region, country, limit: 6, ownLang: true }).catch(() => []),
     fetchStatus().catch(() => null),
     fetchLatestStories({ limit: 5, category: cat || null, country: country || null }).catch(() => []),
   ]);
@@ -230,7 +285,7 @@ async function loadSide() {
     : [h("li", { class: "note" }, L("لا أخبار عاجلة حالياً.", "No breaking news right now."))]));
   const srcs = [...state.sources.values()].filter((s) => s.enabled);
   statusPanel.replaceChildren(
-    ...srcs.slice(0, 14).map((s) => {
+    ...srcs.slice(0, 8).map((s) => {
       const stale = !s.last_success_at || Date.now() - new Date(s.last_success_at).getTime() > 3600_000;
       return h("div", {}, h("span", { class: "dot" + (stale ? " stale" : "") }), EN ? s.name_en || s.name_ar : s.name_ar, h("span", { class: "when num" }, s.last_success_at ? ago(s.last_success_at) : L("لم يُجلب بعد", "not fetched yet")));
     }),
@@ -322,6 +377,8 @@ async function boot() {
   try {
     state.sources = await loadSources();
     await Promise.all([loadInitial(), loadLead()]);
+    loadTrendsHome(); loadFeatures();
+    setInterval(() => { if (!document.hidden) { loadTrendsHome(); loadFeatures(); } }, 180_000);
     const status = await loadSide();
     chrome.setLiveState("connecting", status?.last_run_at);
     chrome.refreshTicker();

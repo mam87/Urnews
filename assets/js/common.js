@@ -14,9 +14,10 @@ export const ARTICLE_COLS = "id,source_id,url,title,title_original,summary,summa
 // Sections. In the English edition "world" comes first; Jordan is one country among all others in both.
 const CATS = [
   ["world", "دولي", "World"], ["politics", "سياسة", "Politics"], ["economy", "اقتصاد وأعمال", "Business"], ["tech", "تكنولوجيا وذكاء اصطناعي", "Tech & AI"],
-  ["health", "صحة وعلوم", "Health & Science"], ["environment", "بيئة ومناخ", "Climate"], ["arab", "العالم العربي", "Arab World"], ["palestine", "فلسطين", "Palestine"],
+  ["health", "صحة", "Health"], ["environment", "بيئة ومناخ", "Climate"], ["arab", "العالم العربي", "Arab World"], ["palestine", "فلسطين", "Palestine"],
   ["jordan", "الأردن", "Jordan"], ["sports", "رياضة", "Sports"], ["weather", "طقس", "Weather"], ["security", "أمن وجريمة", "Security"],
   ["education", "تعليم", "Education"], ["entertainment", "فن وثقافة", "Culture"],
+  ["science", "علوم وفضاء", "Science & Space"], ["nature", "طبيعة وحيوانات", "Nature & Animals"], ["opinion", "مقالات وتحليلات", "Opinion & Analysis"],
 ];
 export const CATEGORIES = CATS.map(([slug, ar, en]) => [slug, EN ? en : ar]);
 export const CAT_NAME = Object.fromEntries(CATEGORIES);
@@ -46,6 +47,22 @@ export const SUMMARY_KIND = EN ? {
   ai: "ملخص آلي بالذكاء الاصطناعي — ليس اقتباساً حرفياً",
   editor: "ملخص من تحرير الموقع",
 };
+
+/** Fully vocalised text (a harakah on nearly every letter) is hard to read on screens: drop the marks, keep shadda. */
+export function plain(s) {
+  const t = String(s || "");
+  const marks = (t.match(/[\u064B-\u0650\u0652]/g) || []).length;
+  return marks > t.length * 0.12 ? t.replace(/[\u064B-\u0650\u0652\u0640]/g, "") : t;
+}
+/** The excerpt to show under a headline, or null. Never an excerpt in the other language: an Arabic headline
+ *  with the publisher's English excerpt (or the reverse) reads as "not translated". */
+export function summaryOf(a) {
+  const t = a?.summary;
+  if (!t) return null;
+  const ar = /[\u0621-\u064A]/.test(t);
+  if (EN) return !a.translated && !ar ? t : null;
+  return ar ? plain(t) : null;
+}
 
 /** Hyperscript-style element builder. Text is always inserted as text (never HTML). */
 export function h(tag, attrs = {}, ...children) {

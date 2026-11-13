@@ -18,8 +18,9 @@ export function scoreTitle(e) {
 }
 
 /** Ranked events (optionally breaking only / one region / one country) with their reports attached. */
-export async function fetchGlobalEvents({ breakingOnly = false, region = null, country = null, limit = 30 } = {}) {
-  let q = sb.from("news_global_events").select("*").order("rank", { ascending: true }).limit(limit);
+export async function fetchGlobalEvents({ breakingOnly = false, region = null, country = null, limit = 30, ownLang = false } = {}) {
+  // ownLang: only events that already have a headline in the reader's language (more rows are read, then trimmed)
+  let q = sb.from("news_global_events").select("*").order("rank", { ascending: true }).limit(ownLang ? Math.min(100, limit * 3) : limit);
   if (breakingOnly) q = q.eq("is_breaking", true);
   if (region) q = q.eq("region", region);
   if (country) q = q.contains("countries", [country]);
@@ -34,7 +35,9 @@ export async function fetchGlobalEvents({ breakingOnly = false, region = null, c
     if (e2) throw e2;
     for (const a of data || []) arts.set(a.id, a);
   }
-  return events.map((e) => ({ ...e, arts })).filter((e) => e.arts.has(e.lead_article_id));
+  const out = events.map((e) => ({ ...e, arts })).filter((e) => e.arts.has(e.lead_article_id));
+  if (!ownLang) return out;
+  return out.filter((e) => { const a = eventHead(e); return a && (EN ? !!a.title_en : a.language === "ar"); }).slice(0, limit);
 }
 
 /** The report to show for this event in the reader's language (falls back to the other language). */
