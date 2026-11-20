@@ -1,0 +1,135 @@
+/* =====================================================================
+   v4 (2026-11-21) — «Newsroom» identity, in the style of the big global
+   news networks: solid black chrome, a red Lahza logo block, a red
+   breaking bar, white pages, thick black rules over every section and
+   square corners. Loaded after app.css on every page; remove the <link>
+   to go back to the v3 gold theme.
+   ===================================================================== */
+:root {
+  --red: #c8102e; --red-ink: #a30d25;
+  --bg: #ffffff; --bg-2: #ffffff; --ink: #0c0c0c; --ink-2: #3d3d3d; --ink-3: #595959;
+  --rule: #e2e2e2; --rule-strong: #0c0c0c; --chip: #f2f2f2;
+  --accent: var(--red); --accent-ink: var(--red-ink); --accent-soft: #fbe4e7; --breaking: var(--red); --breaking-soft: #fbe4e7;
+  --chrome: #0c0c0c; --chrome-2: #0c0c0c; --chrome-3: #262626; --chrome-ink: #ffffff; --chrome-ink-2: #d6d6d6; --chrome-rule: #2e2e2e; --gold: #ffffff;
+  --radius: 0px; --radius-lg: 0px; --shadow: none;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0c0c0c; --bg-2: #141414; --ink: #f2f2f2; --ink-2: #c9c9c9; --ink-3: #a3a3a3; --rule: #2a2a2a; --rule-strong: #f2f2f2; --chip: #1f1f1f;
+  --accent: #ff5468; --accent-ink: #ff7a8a; --accent-soft: #3b1418; --breaking: #e01a37; --breaking-soft: #3b1418; --shadow: none; } }
+:root[data-theme="dark"] {
+  --bg: #0c0c0c; --bg-2: #141414; --ink: #f2f2f2; --ink-2: #c9c9c9; --ink-3: #a3a3a3; --rule: #2a2a2a; --rule-strong: #f2f2f2; --chip: #1f1f1f;
+  --accent: #ff5468; --accent-ink: #ff7a8a; --accent-soft: #3b1418; --breaking: #e01a37; --breaking-soft: #3b1418; --shadow: none; }
+
+a:hover { color: var(--accent-ink); }
+:focus-visible { outline-color: var(--red); }
+.linklike:hover { color: #ffffff; text-decoration: underline; }
+
+/* ---- chrome: date strip ---- */
+.topstrip { background: #000000; border-bottom-color: #1f1f1f; }
+.topstrip a:hover { color: #ffffff; text-decoration: underline; }
+.wclock b { color: #ffffff; }
+
+/* ---- chrome: masthead with the red logo block ---- */
+.masthead, :root[data-theme="dark"] .masthead { background: var(--chrome); backdrop-filter: none; border-bottom: 0; }
+.masthead::after { content: none; }
+.masthead .wrap.bar { min-height: 64px; }
+.brand { align-self: stretch; margin-block: 8px; background: var(--red); color: #ffffff; padding: 0 14px; gap: 8px; font-size: 1.6rem; line-height: 1; }
+.brand:hover { color: #ffffff; background: var(--red-ink); }
+.brand .mark, :root[data-theme="dark"] .brand .mark { width: auto; height: auto; background: transparent; box-shadow: none; border-radius: 0; }
+.brand .mark svg { color: #ffffff; width: 26px; height: 18px; }
+.brand small { color: #ffffff; opacity: .9; border-inline-start-color: rgba(255, 255, 255, .45); }
+.masthead .icon-btn { border-radius: 0; color: #ffffff; }
+.masthead .icon-btn:hover { background: var(--chrome-3); color: #ffffff; }
+.masthead .live-pill { border-radius: 0; background: transparent; border-color: #5a5a5a; color: #ffffff; }
+.masthead .search input { border-radius: 0; background: #1a1a1a; border-color: #3a3a3a; color: #ffffff; }
+.search-mobile input { border-radius: 0; background: #1a1a1a; border-color: #3a3a3a; color: #ffffff; }
+@media (max-width: 520px) { .brand { font-size: 1.3rem; padding: 0 10px; } }
+
+/* ---- chrome: red breaking bar ---- */
+.ticker, :root[data-theme="dark"] .ticker { background: var(--red); color: #ffffff; border-bottom: 0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ticker { background: var(--breaking); } }
+.ticker .wrap { min-height: 44px; }
+.ticker-label { background: #000000; color: #ffffff; font-size: .9375rem; padding: 0 18px; }
+.ticker-move a { color: #ffffff; }
+.ticker-move a:hover { color: #ffffff; text-decoration: underline; }
+.ticker-move .t-time { opacity: .85; }
+.ticker-move .sep { background: #ffffff; border-radius: 50%; transform: none; width: 5px; height: 5px; }
+.ticker-empty { opacity: .9; min-height: 44px; }
+
+/* ---- navigation: black page row, white section row ---- */
+.catnav .nav-pages { background: var(--chrome); border-top: 1px solid #1f1f1f; border-bottom: 0; }
+.catnav .nav-pages a { color: #ffffff; }
+.catnav .nav-pages a:hover { background: var(--chrome-3); color: #ffffff; }
+.catnav .nav-pages a[aria-current="page"] { color: #ffffff; }
+.catnav .nav-pages a[aria-current="page"]::after { background: var(--red); border-radius: 0; height: 4px; }
+.catnav .nav-pages a.breaking-link, .catnav .nav-pages a.live-link,
+.catnav .nav-pages a.breaking-link[aria-current="page"], .catnav .nav-pages a.live-link[aria-current="page"] { color: #ff7a8a; }
+.catnav .nav-pages a.trend-link { color: #ffffff; }
+.catnav .nav-cats { background: var(--bg); border-bottom: 1px solid var(--rule); }
+.catnav .nav-cats a { border-radius: 0; color: var(--ink); }
+.catnav .nav-cats a:hover { background: var(--chip); text-decoration: underline; }
+.catnav .nav-cats a[aria-current="page"] { background: var(--ink); color: var(--bg); }
+
+/* ---- section headings: thick black rule on top, no gold bar ---- */
+.section-head { border-top: 4px solid var(--rule-strong); padding-top: 12px; margin-top: 10px; }
+.section-head h1, .section-head h2 { padding-inline-start: 0; }
+.section-head h1::before, .section-head h2::before { content: none; }
+.section-head h2 { font-size: 1.375rem; }
+.section-head h1 { font-size: 1.75rem; }
+
+/* ---- home: lead story ---- */
+.lead { border-top: 4px solid var(--rule-strong); padding-top: 16px; }
+.lead-main h3 { font-size: clamp(1.6rem, 1rem + 2.4vw, 2.5rem); }
+.lead-main h3 a:hover, .lead-side h3 a:hover, .card h3 a:hover, .sec h3 a:hover, .feat h3 a:hover { color: var(--ink); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; }
+.lead-img, .lead-img img { border-radius: 0; }
+.lead-img:hover img { transform: none; }
+.lead-side .thumb, .card .img, .sec-top img, .feat-img img { border-radius: 0; }
+.lead-side h3 { font-size: 1.0625rem; }
+
+/* ---- cards and blocks: flat, ruled ---- */
+.card { border-radius: 0; }
+.card h3 a { background-image: none; }
+.chip { border-radius: 0; }
+.chip.cat { color: var(--accent-ink); }
+.chip.breaking { background: var(--red); }
+.sec, .feat { background: transparent; border: 0; border-top: 4px solid var(--rule-strong); border-radius: 0; padding: 12px 0 6px; overflow: visible; }
+.sec::before, .feat::before { content: none; }
+.sec-head h2, .feat-head h2 { font-size: 1.25rem; color: var(--ink); }
+.sec-head a, .feat-head a { font-weight: 700; color: var(--ink); }
+.feat li { border-top-style: solid; }
+
+/* ---- side panels ---- */
+.panel, aside .panel { background: transparent; border: 0; border-top: 4px solid var(--rule-strong); border-radius: 0; box-shadow: none; padding: 12px 0 4px; }
+aside .panel h2 { font-size: 1.125rem; }
+aside .panel:first-child { border-top-color: var(--red); }
+.tr-mini li::before { color: var(--red); font-size: 1.15em; }
+
+/* ---- trend strip ---- */
+.trend-strip { border-radius: 0; box-shadow: none; border-color: var(--rule); }
+.ts-label { background: #000000; color: #ffffff; }
+.ts-label:hover { color: #ffffff; text-decoration: underline; }
+.ts-track a { border-radius: 0; }
+.ts-track a.ts-more { color: var(--accent-ink); }
+
+/* ---- controls ---- */
+.btn, .seg, .seg button { border-radius: 0; }
+.btn-primary { background: var(--red); border-color: var(--red); color: #ffffff; }
+.btn-primary:hover { background: var(--red-ink); color: #ffffff; filter: none; }
+.btn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.to-top { border-radius: 0; background: #000000; color: #ffffff; }
+.new-banner button { border-radius: 0; color: #ffffff; }
+
+/* ---- footer ---- */
+footer.site { background: var(--chrome); color: var(--chrome-ink-2); border-top: 4px solid var(--red); }
+footer.site .brand { display: inline-flex; align-self: flex-start; margin: 0 0 12px; padding: 8px 14px; color: #ffffff; }
+footer.site a:hover, footer.site .linklike:hover { color: #ffffff; }
+
+/* ---- phones ---- */
+@media (max-width: 899px) {
+  .bottombar { background: #000000; backdrop-filter: none; border-top: 0; }
+  .bottombar a, .bottombar button { color: #d6d6d6; }
+  .bottombar [aria-current="page"] { color: #ffffff; box-shadow: inset 0 3px 0 var(--red); }
+}
+dialog.more-sheet { border-radius: 0; }
+.ms-grid a, .ms-cats a { border-radius: 0; }
+.ms-grid a svg { color: var(--red); }
