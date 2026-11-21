@@ -198,6 +198,8 @@ const noOverflow = (page) => page.evaluate(() => document.documentElement.scroll
   await page.waitForSelector(".scoreboard");
   ok(await page.$eval("html", (e) => e.dir === "ltr"), "LTR in English");
   ok(await page.$eval(".sb-score .big", (e) => e.textContent.replace(/\s/g, "") === "2-1"), "score");
+  // RTL: the home team is on the right, so the home score (2) must be drawn to the right of the away score (1)
+  ok(await page.$eval(".sb-score .big", (e) => { const [hs, , as] = e.children; return hs.getBoundingClientRect().left > as.getBoundingClientRect().left; }), "home score sits on the home team's side (not reversed in RTL)");
   ok(await page.$eval(".sb-ht", (e) => e.textContent.includes("1 - 0")), "half-time score");
   const inc = await page.$$eval(".incidents li", (x) => x.map((e) => e.textContent));
   ok(inc.length === 6 && inc[0].includes("Raphinha") && inc.some((t) => t.includes("Red card")) && inc.some((t) => t.includes("Substitution")), "goals, cards and substitutions listed in order");

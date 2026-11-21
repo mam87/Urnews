@@ -72,6 +72,11 @@ function statusCell(m) {
   return h("span", { class: "st" }, ph(m.statusText) || "—");
 }
 const score = (v) => (v === null || v === undefined ? "–" : String(v));
+/** Home score then away score, laid out in the page's own direction so each number sits on its team's side
+ *  (home on the right in Arabic, on the left in English). Never force LTR here: that swapped the scores in RTL. */
+const pair = (a, b, sep = " - ") => [h("span", {}, score(a)), h("span", { class: "sep", "aria-hidden": "true" }, sep.trim()), h("span", {}, score(b))];
+// Plain text (tab title): spaces around "-" let the browser's bidi place each number by its team in Arabic too.
+const pairText = (a, b) => `${score(a)} - ${score(b)}`;
 
 /** One match: status / kick-off on the leading edge, then the two teams one above the other with their scores. */
 function matchRow(m) {
@@ -83,7 +88,7 @@ function matchRow(m) {
     statusCell(m),
     h("span", { class: "teams" }, side("home", m.home, m.homeLogo, m.homeScore, win === "h"), side("away", m.away, m.awayLogo, m.awayScore, win === "a")),
   ];
-  const label = `${tName(m.home)} ${scored ? score(m.homeScore) + " - " + score(m.awayScore) : L("ضد", "v")} ${tName(m.away)}`;
+  const label = `${tName(m.home)} ${scored ? score(m.homeScore) + " " + L("مقابل", "-") + " " + score(m.awayScore) : L("ضد", "v")} ${tName(m.away)}`;
   return m.slug ? h("a", { class: "mrow", href: url({ match: m.slug }), "aria-label": label, dataset: { status: m.status } }, inner)
     : h("div", { class: "mrow", dataset: { status: m.status } }, inner);
 }
@@ -353,7 +358,7 @@ async function viewMatch(slug) {
     fresh.replaceChildren(freshness(res));
     if (!res.data) { put(body, errorState(res, () => load(true))); return poll(null, 0); }
     const m = res.data;
-    document.title = `${tName(m.home)} ${score(m.homeScore)}-${score(m.awayScore)} ${tName(m.away)} — ${L("لحظة", "Lahza")}`;
+    document.title = `${tName(m.home)} ${pairText(m.homeScore, m.awayScore)} ${tName(m.away)} — ${L("لحظة", "Lahza")}`;
     const c = COMP_BY_NAME[(m.competition || "").toLowerCase()];
     const board = h("section", { class: "scoreboard" + (m.status === "live" ? " is-live" : "") },
       h("div", { class: "sb-comp" }, logo(m.competitionLogo, "lg sm"), c ? h("a", { href: url({ comp: c[0] }) }, compName(c[0])) : compName(m.competition),
@@ -361,9 +366,10 @@ async function viewMatch(slug) {
       h("div", { class: "sb-main" },
         h("div", { class: "sb-team" }, logo(m.homeLogo, "lg xl"), h("b", {}, tName(m.home))),
         h("div", { class: "sb-score" },
-          h("div", { class: "num big" }, m.status === "upcoming" ? (m.time ? time(m.time) : "—") : `${score(m.homeScore)} - ${score(m.awayScore)}`),
+          m.status === "upcoming" ? h("div", { class: "num big" }, m.time ? time(m.time) : "—")
+            : h("div", { class: "num big sb-pair", "aria-label": `${tName(m.home)} ${score(m.homeScore)}، ${tName(m.away)} ${score(m.awayScore)}` }, pair(m.homeScore, m.awayScore)),
           statusCell(m),
-          m.htHome !== null && m.htAway !== null && m.status !== "upcoming" ? h("div", { class: "sb-ht num" }, L("الشوط الأول: ", "Half-time: "), `${m.htHome} - ${m.htAway}`) : null),
+          m.htHome !== null && m.htAway !== null && m.status !== "upcoming" ? h("div", { class: "sb-ht num" }, L("الشوط الأول: ", "Half-time: "), h("span", { class: "sb-pair" }, pair(m.htHome, m.htAway))) : null),
         h("div", { class: "sb-team" }, logo(m.awayLogo, "lg xl"), h("b", {}, tName(m.away)))));
 
     const inc = [...m.incidents].sort((a, b) => (a.time ?? 0) - (b.time ?? 0));
@@ -371,7 +377,7 @@ async function viewMatch(slug) {
       h("ol", {}, inc.map((x) => { const [ic, label] = INCIDENT(x.type); return h("li", { class: "side-" + (x.side === "away" ? "away" : "home") },
         h("span", { class: "min num" }, x.time != null ? `${x.time}'` : ""), h("span", { class: "ic", "aria-hidden": "true" }, ic),
         h("span", {}, h("b", {}, label), x.player ? " — " + x.player : "", " ", h("span", { class: "sub" }, "(", tName(x.side === "away" ? m.away : m.home), ")"),
-          x.is_goal && x.home_score != null ? h("span", { class: "num gscore" }, ` ${x.home_score}-${x.away_score}`) : null)); })))
+          x.is_goal && x.home_score != null ? h("span", { class: "num gscore sb-pair" }, pair(x.home_score, x.away_score, "-")) : null)); })))
       : h("p", { class: "note" }, m.status === "upcoming" ? L("لم تبدأ المباراة بعد.", "The match has not started yet.") : L("لا تفاصيل أحداث متاحة لهذه المباراة من المزوّد.", "The provider has no event details for this match."));
 
     const statRows = m.stats.filter((s) => s && (s.home !== undefined || s.away !== undefined));
