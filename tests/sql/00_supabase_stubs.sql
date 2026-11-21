@@ -49,3 +49,5 @@ create schema if not exists net;
 create table if not exists net._http_response (id bigint primary key, status_code int, content text, error_msg text, timed_out boolean default false, created timestamptz default now());
 create sequence if not exists net.http_request_seq start 1;
 create or replace function net.http_get(url text, timeout_milliseconds int default 5000, headers jsonb default '{}') returns bigint language sql as $$ select nextval('net.http_request_seq') $$;
+create or replace function cron.alter_job(job_id bigint, schedule text default null, command text default null, database text default null, username text default null, active boolean default null)
+returns void language sql as $$ update cron.job set active = coalesce(alter_job.active, cron.job.active) where jobid = job_id $$;

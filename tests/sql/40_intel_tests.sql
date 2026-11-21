@@ -8,6 +8,13 @@ end $$;
 reset role;
 set request.jwt.claim.sub = '';
 
+-- whole-word matching
+select pg_temp.ok(public.intel_has_term(public.intel_words('Ukraine war: front line update'), 'rain') = false, 'rain does not match Ukraine');
+select pg_temp.ok(public.intel_has_term(public.intel_words('Heavy rain floods the city'), 'rain'), 'rain matches the word rain');
+select pg_temp.ok(public.intel_has_term(public.intel_words('Carney meets leaders'), 'car') = false, 'car does not match Carney');
+select pg_temp.ok(public.intel_has_term(public.intel_words('Real Madrid win, Champions League'), 'champions league'), 'two-word phrase matches');
+select pg_temp.ok(public.intel_has_term(public.intel_words('قمة «إسرائيل» والعراق؟'), 'إسرائيل'), 'Arabic word matches through punctuation');
+
 -- sections
 select pg_temp.ok(public.intel_video_section('Missile strikes hit the front line', 'politics') = 'war', 'war words move a newsroom video to war');
 select pg_temp.ok(public.intel_video_section('غارات جوية على مواقع عسكرية', 'politics') = 'war', 'Arabic war words recognised');
@@ -60,7 +67,7 @@ select pg_temp.ok((select last_error = 'HTTP 404' from public.intel_yt_channels 
 -- fused trends: one term searched in 3 countries and found in a Lahza report and in the video → global
 insert into public.news_trends (geo, title, rank, traffic, seen_at) values
   ('JO', 'summit', 1, 5000, now()), ('SA', 'summit', 2, 2000, now()), ('EG', 'Summit', 3, 1000, now()),
-  ('JO', 'local fair', 4, 100, now());
+  ('JO', 'local fair', 4, 100, now()), ('JO', 'leaders', 5, 100, now()), ('JO', '2027', 6, 100, now());
 insert into public.news_articles (source_id, guid, url, url_hash, title, summary, summary_kind, category, categories, published_at, language)
 values (1, 'i1', 'https://alpha.example/i1', repeat('6', 64), 'Leaders gather for the summit', null, 'none', 'politics', '{politics}', now() - interval '1 hour', 'en');
 select pg_temp.ok((public.intel_trends_refresh() ->> 'trends')::int >= 2, 'trend terms fused');
@@ -68,6 +75,8 @@ select pg_temp.ok((select count(*) from public.intel_trends where key in ('summi
 select pg_temp.ok((select n_countries = 3 and news_hits >= 1 and video_hits = 1 and platforms = 3 and is_global and geos = '{EG,JO,SA}'
   from public.intel_trends where key = 'summit'), 'summit: 3 countries, news + YouTube → global');
 select pg_temp.ok((select not is_global and platforms = 1 from public.intel_trends where key = 'local fair'), 'one platform in one country is never global');
+select pg_temp.ok((select not is_global and platforms >= 2 from public.intel_trends where key = 'leaders'), 'searched in one country is never global, even when covered');
+select pg_temp.ok(not exists (select 1 from public.intel_trends where key = '2027'), 'numbers-only terms are not fused');
 select pg_temp.ok((select direction = 'new' from public.intel_trends where key = 'summit'), 'new trend marked new');
 select public.intel_trends_refresh();
 select pg_temp.ok((select direction = 'flat' and prev_score is not null from public.intel_trends where key = 'summit'), 'second run compares with the previous score');
@@ -75,9 +84,9 @@ select pg_temp.ok((select direction = 'flat' and prev_score is not null from pub
 -- translation lane
 set role service_role;
 create temp table took as select * from public.intel_translate_take(10);
-select pg_temp.ok((select count(*) filter (where kind = 'video') = 1 and count(*) filter (where kind = 'trend') = 1 from took), 'lane hands out the top video and the multi-platform English trend');
+select pg_temp.ok((select count(*) filter (where kind = 'video') = 1 and count(*) filter (where kind = 'trend') >= 1 from took), 'lane hands out the top video and multi-platform English trends');
 select pg_temp.ok(public.intel_set_translations((select jsonb_agg(jsonb_build_object('kind', kind, 'id', id, 'title',
-  case kind when 'video' then 'لماذا تهم القمة' else 'القمة' end)) from took)) = 2, 'translations saved');
+  case kind when 'video' then 'لماذا تهم القمة' else 'القمة' end)) from took)) = (select count(*) from took), 'translations saved');
 reset role;
 select pg_temp.ok((select title_ar = 'لماذا تهم القمة' from public.intel_yt_videos where video_id = 'AAAAAAAAAA1'), 'video has an Arabic title');
 select pg_temp.ok((select term_ar = 'القمة' from public.intel_trends where key = 'summit'), 'trend has an Arabic name');
