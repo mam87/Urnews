@@ -78,7 +78,8 @@ const DIR = { new: ["✦", L("جديد", "New")], up: ["▲", L("صاعد", "Ris
 function whyTrend(t) {
   const bits = [];
   if (t.n_countries) bits.push(EN ? `searched in ${t.n_countries} ${t.n_countries === 1 ? "country" : "countries"}` : t.n_countries === 1 ? "يُبحث عنه في دولة واحدة" : `يُبحث عنه في ${t.n_countries} دول`);
-  if (t.news_publishers) bits.push(EN ? `covered by ${t.news_publishers} publisher${t.news_publishers === 1 ? "" : "s"} in Lahza's feeds` : `تغطيه ${t.news_publishers} ${t.news_publishers <= 10 ? "جهات نشر" : "جهة نشر"} في مصادر لحظة`);
+  const np = t.news_publishers;
+  if (np) bits.push(EN ? `covered by ${np} publisher${np === 1 ? "" : "s"} in Lahza's feeds` : `تغطيه ${np === 1 ? "جهة نشر واحدة" : np === 2 ? "جهتا نشر" : np <= 10 ? `${np} جهات نشر` : `${np} جهة نشر`} في مصادر لحظة`);
   if (t.video_hits) bits.push(EN ? `in ${t.video_hits} recent analysis video${t.video_hits === 1 ? "" : "s"}` : `يظهر في ${t.video_hits} من فيديوهات التحليل الحديثة`);
   return bits.join(L("، ", ", ")) + ".";
 }
@@ -105,7 +106,7 @@ function trendItem(t, i) {
 }
 async function loadTrends() {
   try {
-    const { data, error } = await sb.from("intel_trends").select("*").gt("last_seen_at", new Date(Date.now() - 6 * 3600e3).toISOString())
+    const { data, error } = await sb.from("intel_trends").select("key,term,term_ar,geos,n_countries,traffic_max,news_hits,news_publishers,video_hits,platforms,is_global,category,score,direction,google_news,first_seen_at,last_seen_at").gt("last_seen_at", new Date(Date.now() - 6 * 3600e3).toISOString())
       .order("is_global", { ascending: false }).order("score", { ascending: false }).limit(10);
     if (error) throw error;
     trendsEl.replaceChildren(...(data.length ? data.map(trendItem) : [h("li", { class: "note" }, L("لم تُرصد ترندات بعد. يُحدَّث كل 10 دقائق.", "No trends detected yet. Updated every 10 minutes."))]));
@@ -122,7 +123,11 @@ function whyVideo(v) {
   if (v.velocity_ratio && v.velocity_ratio >= 1.5) out.push(L(`المشاهدات أسرع ${v.velocity_ratio}× من معدل القناة`, `views ${v.velocity_ratio}× faster than the channel's usual`));
   if (v.vph) out.push(L(`${num(Math.round(v.vph))} مشاهدة/ساعة`, `${num(Math.round(v.vph))} views/hour`) + (p.measured ? "" : L(" (متوسط منذ النشر)", " (average since publication)")));
   if (p.eng_pct) out.push(L(`إعجابات ${p.eng_pct}% من المشاهدات`, `likes ${p.eng_pct}% of views`));
-  if (v.related_article_id) out.push(L(`مرتبط بحدث تغطيه ${v.related_publishers} ${v.related_publishers <= 10 ? "جهات" : "جهة"} نشر`, `linked to an event covered by ${v.related_publishers} publisher(s)`));
+  if (v.related_article_id) {
+    const n = v.related_publishers || 1;
+    out.push(EN ? `linked to an event covered by ${n} publisher${n === 1 ? "" : "s"}`
+      : `مرتبط بحدث ${n === 1 ? "تغطيه جهة نشر واحدة" : n === 2 ? "تغطيه جهتا نشر" : n <= 10 ? `تغطيه ${n} جهات نشر` : `تغطيه ${n} جهة نشر`}`);
+  }
   if (v.trend_match) out.push(L(`يتقاطع مع بحث رائج: «${v.trend_match}»`, `matches a trending search: “${v.trend_match}”`));
   return out;
 }

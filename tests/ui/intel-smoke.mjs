@@ -66,7 +66,11 @@ async function open(url, { lang, width = 390, stale = false } = {}) {
       const sec = u.searchParams.get("section");
       return json(route, videos.filter((v) => !sec || sec === `eq.${v.section}`));
     }
-    if (u.pathname === "/rest/v1/intel_trends") return json(route, u.searchParams.get("select") === "updated_at" ? [{ updated_at: iso(3) }] : trends);
+    if (u.pathname === "/rest/v1/intel_trends") {
+      const sel = u.searchParams.get("select");
+      if (sel === "*" || /\b(tid|tr_tries)\b/.test(sel)) return route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ message: "permission denied for table intel_trends" }), headers: { "access-control-allow-origin": "*" } });
+      return json(route, sel === "updated_at" ? [{ updated_at: iso(3) }] : trends);
+    }
     if (u.pathname === "/rest/v1/news_trend_geos") return json(route, [{ last_ok_at: iso(2) }]);
     if (u.pathname === "/rest/v1/rpc/news_site_status") return json(route, { last_run_at: stale ? iso(400) : iso(1) });
     return json(route, []);
