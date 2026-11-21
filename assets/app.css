@@ -680,7 +680,9 @@ td.pts { font-weight: 800; }
 .sb-team { display: grid; justify-items: center; gap: 6px; }
 .sb-team b { font-size: 1rem; }
 .sb-score { display: grid; justify-items: center; gap: 4px; }
-.sb-score .big { font-size: 2.25rem; font-weight: 800; direction: ltr; unicode-bidi: isolate; line-height: 1.1; }
+.sb-score .big { font-size: 2.25rem; font-weight: 800; line-height: 1.1; }
+.sb-pair { display: inline-flex; align-items: baseline; gap: .3em; }
+.sb-pair .sep { opacity: .6; }
 .sb-ht { font-size: .75rem; color: var(--ink-3); }
 .incidents ol { list-style: none; margin: 0 0 16px; padding: 0; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--bg-2); }
 .incidents li { display: grid; grid-template-columns: 44px 30px 1fr; align-items: center; gap: 6px; padding: 8px 12px; border-bottom: 1px solid var(--rule); font-size: .875rem; }
@@ -688,7 +690,8 @@ td.pts { font-weight: 800; }
 .incidents li.side-away { background: color-mix(in srgb, var(--chip) 45%, transparent); }
 .incidents .min { font-weight: 800; color: var(--ink-2); }
 .incidents .sub { color: var(--ink-3); font-size: .75rem; }
-.incidents .gscore { font-weight: 800; direction: ltr; unicode-bidi: isolate; }
+.incidents .gscore { font-weight: 800; margin-inline-start: .4em; }
+.incidents .gscore.sb-pair { gap: .1em; }
 .sp-profile { display: flex; align-items: center; gap: 14px; margin: 6px 0 16px; }
 .sp-profile h2 { margin: 0; font-family: var(--f-head); font-size: 1.375rem; }
 .sp-profile .sub { color: var(--ink-3); font-size: .8125rem; display: flex; align-items: center; gap: 6px; }
