@@ -81,6 +81,7 @@ select pg_temp.ok(public.intel_set_translations((select jsonb_agg(jsonb_build_ob
 reset role;
 select pg_temp.ok((select title_ar = 'لماذا تهم القمة' from public.intel_yt_videos where video_id = 'AAAAAAAAAA1'), 'video has an Arabic title');
 select pg_temp.ok((select term_ar = 'القمة' from public.intel_trends where key = 'summit'), 'trend has an Arabic name');
+select pg_temp.ok(public.intel_translate_tick() is null, 'translation tick is idle when nothing is waiting');
 
 -- permissions
 set role anon;

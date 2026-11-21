@@ -1,5 +1,5 @@
 // Pure helpers of news-translate (prompt, parsing, guard rails) — unit-tested in tests/translate_test.ts.
-export interface Item { id: number; title: string; summary: string | null; source_name: string; kind?: "video" | "trend" }
+export interface Item { id: number; title: string; summary: string | null; source_name: string }
 export interface Out { title: string; summary: string }
 
 export const SYSTEM = `أنت محرر أخبار عربي دقيق. مهمتك فقط ترجمة العناوين والنصوص المعطاة إلى العربية الفصحى.

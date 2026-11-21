@@ -27,6 +27,7 @@ jobs:
           (cd supabase/functions/news-notify && deno check index.ts)
           (cd supabase/functions/news-stories && deno check index.ts)
           (cd supabase/functions/news-translate && deno check index.ts && deno test -A tests/)
+          (cd supabase/functions/intel-translate && deno check index.ts && deno test -A tests/)
       - name: Database tests (RLS, permissions, dedup, scheduler lease, alerts, search)
         env: { PGHOST: localhost, PGPORT: 5432, PGUSER: postgres, PGPASSWORD: postgres }
         run: |

@@ -10,9 +10,9 @@
 -- 2) Cross-platform trends: Google Trends "trending now" (28 countries, collected since migration 28) fused with
 --    Lahza's own reports (65 publisher feeds) and the YouTube videos above. A topic is labelled GLOBAL only when it
 --    appears on 2+ platforms AND in 3+ countries or 3+ independent publishers — never from one platform or country.
--- 3) The news-translate lane also translates the top videos' titles and non-Arabic trend keywords (same daily AI
---    budget and guard rails).
--- Collected by pg_cron + pg_net like the Reels feeds. Additive: no existing table or job is dropped.
+-- 3) A separate Edge Function, intel-translate, translates the top videos' titles and non-Arabic trend keywords
+--    (same daily AI budget and guard rails as news-translate).
+-- Collected by pg_cron + pg_net like the Reels feeds. Additive only: no existing table, function or job is changed.
 
 -- ---------------------------------------------------------------------------------------------------------
 -- 1) Channels
@@ -483,48 +483,25 @@ begin
   return n1 + n2;
 end $$;
 
--- the 5-minute translation tick now also wakes the function when intelligence items wait
-create or replace function public.news_translate_tick() returns bigint
+-- Wakes the Edge Function intel-translate only when something waits (existing functions are left unchanged).
+create or replace function public.intel_translate_tick() returns bigint
 language plpgsql security definer set search_path = '' as $$
 begin
   if not exists (
-    select 1 from public.news_articles a left join public.news_translate_attempts t on t.article_id = a.id
-    where a.language = 'en' and not a.translated and not a.edited and a.status = 'published' and a.duplicate_of is null
-      and a.category in ('science', 'nature', 'opinion') and a.published_at > now() - interval '36 hours' and coalesce(t.tries, 0) < 2
-  ) and not exists (
     select 1 from public.intel_yt_videos x
     where x.language = 'en' and x.title_ar is null and x.tr_tries < 2 and x.published_at > now() - interval '72 hours'
       and (coalesce(x.popularity, 0) >= 35 or coalesce(x.editorial, 0) >= 60)
   ) and not exists (
     select 1 from public.intel_trends y where not y.term_is_ar and y.term_ar is null and y.tr_tries < 2 and y.platforms >= 2
   ) then return null; end if;
-  return public.news_call_edge_function('news-translate');
+  return public.news_call_edge_function('intel-translate');
 end $$;
 
 revoke all on function public.intel_video_section(text, text), public.intel_youtube_score(), public.intel_youtube_cycle(),
-  public.intel_trends_refresh(), public.intel_translate_take(int), public.intel_set_translations(jsonb), public.news_translate_tick()
+  public.intel_trends_refresh(), public.intel_translate_take(int), public.intel_set_translations(jsonb), public.intel_translate_tick()
   from public, anon, authenticated;
 grant execute on function public.intel_translate_take(int), public.intel_set_translations(jsonb) to service_role;
 
--- Fetch logs: 5 days instead of 14 (frees space on the free plan; run history stays 14 days).
-create or replace function public.news_purge_old()
-returns jsonb language plpgsql security definer set search_path = '' as $$
-declare
-  days int := coalesce((select (value)::text::int from public.news_settings where key = 'retention_days'), 30);
-  n_art int; n_logs int; n_runs int;
-begin
-  delete from public.news_articles where created_at < now() - make_interval(days => days) and not pinned;
-  get diagnostics n_art = row_count;
-  delete from public.news_fetch_logs where started_at < now() - interval '5 days';
-  get diagnostics n_logs = row_count;
-  delete from public.news_ingest_runs where started_at < now() - interval '14 days';
-  get diagnostics n_runs = row_count;
-  delete from public.news_clusters c where not exists (select 1 from public.news_articles a where a.cluster_id = c.id);
-  delete from public.news_alerts where resolved_at < now() - interval '30 days';
-  delete from public.news_ai_usage where day < current_date - 90;
-  return jsonb_build_object('articles', n_art, 'fetch_logs', n_logs, 'runs', n_runs);
-end $$;
-revoke execute on function public.news_purge_old() from public, anon, authenticated;
-
 select cron.schedule('intel-youtube', '6-59/10 * * * *', $$ select public.intel_youtube_cycle(); $$);
 select cron.schedule('intel-trends',  '8-59/10 * * * *', $$ select public.intel_trends_refresh(); $$);
+select cron.schedule('intel-translate', '9-59/10 * * * *', $$ select public.intel_translate_tick(); $$);

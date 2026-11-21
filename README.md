@@ -106,9 +106,9 @@ running.
   public feed and are never estimated.
 * **Fused trends**: Google Trends (28 countries) + Lahza's 65 publisher feeds + the YouTube videos. A topic is labelled
   *global* only on 2+ platforms and in 3+ countries or 3+ independent publishers.
-* `news-translate` also translates the top video titles and non-Arabic trend keywords (same daily AI budget and checks).
-* Scheduler: `intel-youtube` and `intel-trends` every 10 minutes. Retention: snapshots 3 days, videos 10 days,
-  trends 48 h after they were last seen; fetch logs now 5 days. Tests: `tests/sql/40_intel_tests.sql`,
+* Edge Function `intel-translate` translates the top video titles and non-Arabic trend keywords (same daily AI budget and checks).
+* Scheduler: `intel-youtube`, `intel-trends` and `intel-translate` every 10 minutes. Retention: snapshots 3 days, videos 10 days,
+  trends 48 h after they were last seen. Tests: `tests/sql/40_intel_tests.sql`,
   `tests/ui/intel-smoke.mjs`.
 
 ## Sections
