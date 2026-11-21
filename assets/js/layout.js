@@ -121,6 +121,7 @@ export function renderChrome({ active = "home" } = {}) {
   // Pages of the platform (first row on wide screens) and news sections (second row); one scrolling row on phones.
   const PAGES = [
     ["index.html", "home", L("الرئيسية", "Home"), ICONS.home, ""],
+    ["intel.html", "intel", L("الذكاء العالمي", "Global intelligence"), ICONS.pulse, "intel-link"],
     ["breaking.html", "breaking", L("عاجل عالمي", "Global breaking"), ICONS.bolt, "breaking-link"],
     ["trends.html", "trends", L("ترند الآن", "Trending"), ICONS.trend, "trend-link"],
     ["sports.html", "sports", L("المركز الرياضي", "Sports Centre"), ICONS.ball, "sports-link"],
@@ -148,6 +149,7 @@ export function renderChrome({ active = "home" } = {}) {
           h("ul", { class: "two" }, CATEGORIES.map(([slug, name]) => h("li", {}, h("a", { href: `index.html?cat=${slug}` }, name))))),
         h("div", {}, h("h4", {}, L("المنصة", "Platform")),
           h("ul", {},
+            h("li", {}, h("a", { href: "intel.html" }, L("مركز لحظة للذكاء العالمي", "Lahza Global Intelligence"))),
             h("li", {}, h("a", { href: "breaking.html" }, L("الأخبار العاجلة العالمية", "Global breaking news"))),
             h("li", {}, h("a", { href: "trends.html" }, L("ترند الآن حول العالم", "Trending worldwide"))),
             h("li", {}, h("a", { href: "sports.html" }, L("المركز الرياضي والنتائج المباشرة", "Sports centre & live scores"))),

@@ -33,4 +33,4 @@ jobs:
           sudo apt-get install -y postgresql-client >/dev/null
           tests/run-sql-tests.sh | tee /tmp/out.txt
           ! grep -q "FAIL" /tmp/out.txt
-          test "$(grep -c '^  ok -' /tmp/out.txt)" -ge 215
+          test "$(grep -c '^  ok -' /tmp/out.txt)" -ge 250

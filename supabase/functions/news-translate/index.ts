@@ -58,7 +58,14 @@ Deno.serve(async (req) => {
 
   const { data: granted } = await sb.rpc("news_ai_take", { p_n: 1 });
   if (!granted) return json({ translated: 0, reason: "no AI budget or cooling down" });
-  const { data: items, error: e1 } = await sb.rpc("news_translate_take", { p_limit: BATCH });
+  // Feature-section headlines first; when none wait, the intelligence lane (top YouTube analysis titles and
+  // non-Arabic trend keywords, migration 29). Same budget, prompt and guard rails.
+  let lane: "articles" | "intel" = "articles";
+  let { data: items, error: e1 } = await sb.rpc("news_translate_take", { p_limit: BATCH });
+  if (!e1 && !items?.length) {
+    lane = "intel";
+    ({ data: items, error: e1 } = await sb.rpc("intel_translate_take", { p_limit: BATCH }));
+  }
   if (e1 || !items?.length) { await sb.rpc("news_ai_refund", { p_n: 1 }); return json({ translated: 0, reason: e1?.message || "nothing waiting" }); }
 
   const list = items as Item[];
@@ -67,16 +74,19 @@ Deno.serve(async (req) => {
     list.map((it, k) => `### مادة ${k + 1} — المصدر: ${it.source_name}\n${inputs[k]}`).join("\n\n");
   try {
     const text = await callModel(user, Math.min(4000, 260 * list.length + 200));
-    const rows: { id: number; title: string; summary: string | null }[] = [];
+    const rows: { kind?: string; id: number; title: string; summary: string | null }[] = [];
     for (const raw of parseBatch(text)) {
       const i = Number((raw as { i?: unknown })?.i);
-      if (!Number.isInteger(i) || i < 1 || i > list.length || rows.some((r) => r.id === list[i - 1].id)) continue;
+      if (!Number.isInteger(i) || i < 1 || i > list.length) continue;
+      const it = list[i - 1];
+      if (rows.some((r) => r.id === it.id && r.kind === it.kind)) continue;
       const v = validate(inputs[i - 1], raw);
-      if (v) rows.push({ id: list[i - 1].id, title: v.title, summary: v.summary && list[i - 1].summary ? v.summary : null });
+      if (v) rows.push({ kind: it.kind, id: it.id, title: v.title, summary: v.summary && it.summary ? v.summary : null });
     }
-    const { data: n, error: e2 } = rows.length ? await sb.rpc("news_set_translations", { p: rows }) : { data: 0, error: null };
+    const rpc = lane === "intel" ? "intel_set_translations" : "news_set_translations";
+    const { data: n, error: e2 } = rows.length ? await sb.rpc(rpc, { p: rows }) : { data: 0, error: null };
     if (e2) throw new Error(e2.message);
-    return json({ asked: list.length, translated: n });
+    return json({ lane, asked: list.length, translated: n });
   } catch (e) {
     if (e instanceof RateLimited) { await sb.rpc("news_ai_refund", { p_n: 1 }); await sb.rpc("news_ai_backoff", { p_minutes: BACKOFF_MINUTES }); }
     console.error("news-translate", (e as Error).message);

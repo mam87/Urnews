@@ -94,6 +94,23 @@ running.
   phone bottom bar with a "More" sheet. UI tests: `tests/ui/pages-smoke.mjs` (weather, trends) added; pass the site
   directory as an absolute path.
 
+## Global Intelligence centre (2026-11-21)
+* `intel.html` («مركز لحظة للذكاء والتحليل العالمي»): what the world is discussing now, trending YouTube analysis in 10 sections
+  (global, politics, war & security, sports, tech & AI, automotive, science, medicine, economy, documentaries) and the top
+  developments. LIVE pills per feed turn to «متأخر» when data is stale; nothing is shown as live from old data.
+* **YouTube analysis** (migration 29): the public long-form upload feeds of 44 verified channels (Arabic and international
+  newsrooms, economy, tech, automotive, science, WHO, documentaries, sports) — free, no API key. Views and likes are
+  snapshotted every 30 minutes; velocity is compared with each channel's own median. Two separate, explainable scores:
+  **Popularity** (velocity 40 · growth 20 · engagement 25 · cross-platform 15) and **Editorial importance** (channel
+  tier 35 · subject 25 · independent news coverage 25 · analysis format 15). Comment counts and retention are not in the
+  public feed and are never estimated.
+* **Fused trends**: Google Trends (28 countries) + Lahza's 65 publisher feeds + the YouTube videos. A topic is labelled
+  *global* only on 2+ platforms and in 3+ countries or 3+ independent publishers.
+* `news-translate` also translates the top video titles and non-Arabic trend keywords (same daily AI budget and checks).
+* Scheduler: `intel-youtube` and `intel-trends` every 10 minutes. Retention: snapshots 3 days, videos 10 days,
+  trends 48 h after they were last seen; fetch logs now 5 days. Tests: `tests/sql/40_intel_tests.sql`,
+  `tests/ui/intel-smoke.mjs`.
+
 ## Sections
 World · Politics · Economy & Business · Tech & AI · Health · Science & Space · Nature & Animals · Opinion & Analysis · Environment & Climate · Arab world ·
 Palestine · Jordan · Sports · Weather · Security & Crime · Education · Arts & Culture (world first; no country is pinned).
