@@ -80,7 +80,7 @@ function whyTrend(t) {
   if (t.n_countries) bits.push(EN ? `searched in ${t.n_countries} ${t.n_countries === 1 ? "country" : "countries"}` : t.n_countries === 1 ? "يُبحث عنه في دولة واحدة" : `يُبحث عنه في ${t.n_countries} دول`);
   const np = t.news_publishers;
   if (np) bits.push(EN ? `covered by ${np} publisher${np === 1 ? "" : "s"} in Lahza's feeds` : `تغطيه ${np === 1 ? "جهة نشر واحدة" : np === 2 ? "جهتا نشر" : np <= 10 ? `${np} جهات نشر` : `${np} جهة نشر`} في مصادر لحظة`);
-  if (t.video_hits) bits.push(EN ? `in ${t.video_hits} recent analysis video${t.video_hits === 1 ? "" : "s"}` : `يظهر في ${t.video_hits} من فيديوهات التحليل الحديثة`);
+  if (t.video_hits) bits.push(EN ? `in ${t.video_hits} recent analysis video${t.video_hits === 1 ? "" : "s"}` : (t.video_hits === 1 ? "يظهر في فيديو تحليلي حديث" : `يظهر في ${t.video_hits} من فيديوهات التحليل الحديثة`));
   return bits.join(L("، ", ", ")) + ".";
 }
 function trendItem(t, i) {
@@ -91,8 +91,8 @@ function trendItem(t, i) {
     h("span", { class: "in-rank num", "aria-hidden": "true" }, String(i + 1)),
     h("div", { class: "in-main" },
       h("div", { class: "meta-row" },
-        t.is_global ? h("span", { class: "chip in-global", title: L("ظهر في منصتين على الأقل وفي 3 دول أو لدى 3 جهات نشر مستقلة", "Seen on 2+ platforms and in 3+ countries or by 3+ independent publishers") }, L("عالمي", "Global"))
-          : h("span", { class: "chip", title: L("لا يكفي ليوصف بأنه عالمي: منصة واحدة أو دولة واحدة", "Not enough to call it global: one platform or country") }, L("محلي/إقليمي", "Local/regional")),
+        t.is_global ? h("span", { class: "chip in-global", title: L("ظهر في منصتين على الأقل، ويُبحث عنه في 3 دول، أو في دولتين مع تغطية من 5 جهات نشر مستقلة", "Seen on 2+ platforms, and searched in 3+ countries, or in 2 countries with 5+ independent publishers") }, L("عالمي", "Global"))
+          : h("span", { class: "chip", title: L("لا يكفي ليوصف بأنه عالمي: منصة واحدة، أو بحث في دولة واحدة فقط", "Not enough to call it global: one platform, or searched in one country only") }, L("محلي/إقليمي", "Local/regional")),
         t.category ? h("span", { class: "chip" }, CAT_NAME[t.category] || SECTION_NAME[t.category] || t.category) : null,
         h("span", { class: "in-dir", dataset: { d: t.direction }, title: dirLabel }, arrow, " ", dirLabel)),
       h("h3", { dir: termDir(name) }, h("a", { href: searchUrl(t.term), title: L("ابحث عنه في أخبار لحظة", "Search Lahza news for it") }, name)),
